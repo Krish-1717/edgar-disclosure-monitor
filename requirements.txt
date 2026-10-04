@@ -1,10 +1,30 @@
+# Core pipeline
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
-streamlit>=1.32.0
-pandas>=2.0.0
 scikit-learn>=1.4.0
 rapidfuzz>=3.5.0
+
+# Streamlit UI
+streamlit>=1.32.0
+pandas>=2.0.0
+
+# Financial data (financial_metrics.py)
 yfinance>=0.2.36
+
+# LLM classification (llm_classifier.py) — optional, requires OPENAI_API_KEY
 openai>=1.12.0
+
+# Web API (api.py)
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic[email]>=2.0.0
+
+# Scheduling (scheduler.py)
+apscheduler>=3.10.0
+
+# PDF export (export_engine.py) — optional
+reportlab>=4.1.0
+
+# Environment variable management
 python-dotenv>=1.0.0
