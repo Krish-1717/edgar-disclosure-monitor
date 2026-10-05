@@ -239,7 +239,8 @@ def _enrich_news(conn, tickers: list[str]) -> None:
     updated = 0
     for alert in alerts:
         try:
-            coverage_score, article_count = get_coverage_score(
+            # FIX: news_fetcher v2 returns 4-tuple (composite_score, article_count, sentiment_direction, top_bucket)
+            composite, article_count, direction, bucket = get_coverage_score(
                 alert["ticker"],
                 alert["name"],
                 alert["filed"],
@@ -247,7 +248,7 @@ def _enrich_news(conn, tickers: list[str]) -> None:
             # Recompute attention gap with real coverage
             from financial_metrics import combined_attention_gap
             from change_scorer import rank_alert
-            new_gap  = combined_attention_gap(alert["materiality_score"], coverage_score)
+            new_gap  = combined_attention_gap(alert["materiality_score"], composite)
             new_rank = rank_alert(alert["materiality_score"], alert["burial_score"], new_gap)
             with transaction(conn):
                 conn.execute("""
@@ -255,12 +256,12 @@ def _enrich_news(conn, tickers: list[str]) -> None:
                     SET attention_gap = ?, ranking = ?, normalized_coverage = ?,
                         article_count = ?
                     WHERE id = ?
-                """, (new_gap, new_rank, coverage_score, article_count, alert["id"]))
+                """, (new_gap, new_rank, composite, article_count, alert["id"]))
             updated += 1
             log.debug(
                 "  %s %s: coverage=%.2f articles=%d gap=%.1f rank=%d",
                 alert["ticker"], alert["filed"],
-                coverage_score, article_count, new_gap, new_rank,
+                composite, article_count, direction, new_gap, new_rank,
             )
         except Exception as e:
             log.warning("News enrichment failed for alert %d: %s", alert["id"], e)
