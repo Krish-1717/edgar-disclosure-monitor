@@ -1,0 +1,40 @@
+{
+  "edgar": {
+    "rate_limit_per_sec": 10,
+    "cache_dir": "data/cache",
+    "max_filings_to_compare": 2,
+    "supported_forms": ["10-K", "10-Q"]
+  },
+  "news": {
+    "window_days": 3,
+    "quality_threshold": 0.65,
+    "count_weight": 0.35,
+    "quality_weight": 0.65
+  },
+  "scoring": {
+    "critical_threshold": 80,
+    "high_threshold": 60,
+    "medium_threshold": 40,
+    "low_threshold": 20
+  },
+  "notifications": {
+    "email": {
+      "enabled": false,
+      "smtp_host": "smtp.gmail.com",
+      "smtp_port": 587,
+      "smtp_user": "",
+      "smtp_password": "",
+      "from_addr": "",
+      "to_addrs": []
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "",
+      "secret": ""
+    },
+    "in_app": {
+      "enabled": true,
+      "path": "data/notifications.jsonl"
+    }
+  }
+}
