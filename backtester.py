@@ -1,4 +1,254 @@
-"""
+"""backtester.py — Event study backtester for EDGAR Disclosure Monitor."""
+from __future__ import annotations
+import math
+import random
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+from typing import Optional
+
+try:
+    import yfinance as yf
+    _HAS_YF = True
+except ImportError:
+    _HAS_YF = False
+
+
+@dataclass
+class BacktestResults:
+    events_total: int
+    events_with_data: int
+    mean_car_1d: float
+    mean_car_3d: float
+    mean_car_5d: float
+    mean_car_10d: float
+    hit_rate_3d: float          # % of events with positive CAR(0,+3)
+    information_coefficient: float  # Spearman rank correlation (score, CAR_3d)
+    sharpe_5d: float            # Sharpe of long-only CRITICAL strategy, 5-day hold
+    car_by_rank: dict = field(default_factory=dict)
+
+
+def _spearman_ic(xs: list[float], ys: list[float]) -> float:
+    """Spearman rank correlation between two lists."""
+    n = len(xs)
+    if n < 2:
+        return 0.0
+    def rank_list(lst):
+        sorted_idx = sorted(range(n), key=lambda i: lst[i])
+        ranks = [0.0] * n
+        for r, i in enumerate(sorted_idx):
+            ranks[i] = r + 1
+        return ranks
+    rx = rank_list(xs)
+    ry = rank_list(ys)
+    d_sq = sum((rx[i] - ry[i]) ** 2 for i in range(n))
+    return 1.0 - 6 * d_sq / (n * (n * n - 1))
+
+
+class EDGARBacktester:
+    """
+    Event study methodology:
+    - Event date = filing date (t=0)
+    - Estimation window: t=-120 to t=-11 (normal return estimation)
+    - Event window: t=-1, 0, +1, +2, +3, +5, +10
+    - Normal return: market model vs SPY
+    - Abnormal return: actual - predicted (beta * SPY_return + alpha)
+    - CAR: cumulative abnormal return over window
+    """
+
+    def __init__(self, start_date: str = "2023-01-01", end_date: str = "2024-12-31"):
+        self.start_date = start_date
+        self.end_date = end_date
+        self.benchmark = "SPY"
+
+    def _fetch_returns(self, ticker: str, start: date, end: date) -> Optional[dict[date, float]]:
+        """Fetch daily returns dict using yfinance (returns None if unavailable)."""
+        if not _HAS_YF:
+            return None
+        try:
+            td = yf.download(ticker, start=str(start), end=str(end), progress=False, auto_adjust=True)
+            if td.empty:
+                return None
+            closes = td["Close"]
+            rets = {}
+            prev = None
+            for dt_idx, price in closes.items():
+                dt = dt_idx.date() if hasattr(dt_idx, "date") else dt_idx
+                if prev is not None:
+                    rets[dt] = float(price) / float(prev) - 1.0
+                prev = price
+            return rets
+        except Exception:
+            return None
+
+    def compute_car(
+        self,
+        ticker: str,
+        event_date: date,
+        window: tuple[int, int] = (0, 3),
+    ) -> Optional[float]:
+        """
+        Compute cumulative abnormal return over window (days relative to event).
+        Returns None if insufficient data.
+        """
+        estimation_start = event_date - timedelta(days=170)
+        estimation_end = event_date - timedelta(days=10)
+        event_end = event_date + timedelta(days=window[1] + 5)
+
+        ticker_rets = self._fetch_returns(ticker, estimation_start, event_end)
+        bench_rets = self._fetch_returns(self.benchmark, estimation_start, event_end)
+
+        if ticker_rets is None or bench_rets is None:
+            return None
+
+        # Estimate market model in estimation window
+        common_est = [
+            d for d in ticker_rets
+            if estimation_start <= d <= estimation_end and d in bench_rets
+        ]
+        if len(common_est) < 20:
+            return None
+        t_est = [ticker_rets[d] for d in common_est]
+        b_est = [bench_rets[d] for d in common_est]
+        mean_t = sum(t_est) / len(t_est)
+        mean_b = sum(b_est) / len(b_est)
+        cov = sum((t_est[i] - mean_t) * (b_est[i] - mean_b) for i in range(len(t_est)))
+        var_b = sum((b_est[i] - mean_b) ** 2 for i in range(len(b_est)))
+        beta = cov / var_b if var_b > 1e-10 else 1.0
+        alpha = mean_t - beta * mean_b
+
+        # Compute CAR in event window
+        trading_days = sorted(d for d in ticker_rets if d >= event_date)
+        car = 0.0
+        count = 0
+        target = window[1] - window[0] + 1
+        for d in trading_days[:target + 10]:
+            if count >= target:
+                break
+            if d in bench_rets:
+                abnormal = ticker_rets[d] - (alpha + beta * bench_rets[d])
+                car += abnormal
+                count += 1
+        return car if count > 0 else None
+
+    def run_event_study(self, events: list[dict]) -> BacktestResults:
+        """
+        Run event study on list of events.
+        events: [{ticker, date (str YYYY-MM-DD), score (float), rank (str)}]
+        """
+        cars_1d, cars_3d, cars_5d, cars_10d = [], [], [], []
+        scores_with_car = []
+        critical_returns = []
+        car_by_rank: dict[str, list[float]] = {}
+
+        for ev in events:
+            ticker = ev["ticker"]
+            ev_date = date.fromisoformat(ev["date"]) if isinstance(ev["date"], str) else ev["date"]
+            score = float(ev.get("score", 50))
+            rank = ev.get("rank", "MEDIUM")
+
+            car3 = self.compute_car(ticker, ev_date, window=(0, 3))
+            if car3 is None:
+                continue
+
+            car1 = self.compute_car(ticker, ev_date, window=(0, 1)) or car3
+            car5 = self.compute_car(ticker, ev_date, window=(0, 5)) or car3
+            car10 = self.compute_car(ticker, ev_date, window=(0, 10)) or car3
+
+            cars_1d.append(car1)
+            cars_3d.append(car3)
+            cars_5d.append(car5)
+            cars_10d.append(car10)
+            scores_with_car.append((score, car3))
+            car_by_rank.setdefault(rank, []).append(car3)
+
+            if rank == "CRITICAL":
+                critical_returns.append(car5)
+
+        n = len(cars_3d)
+        if n == 0:
+            return BacktestResults(
+                events_total=len(events), events_with_data=0,
+                mean_car_1d=0.0, mean_car_3d=0.0, mean_car_5d=0.0, mean_car_10d=0.0,
+                hit_rate_3d=0.0, information_coefficient=0.0, sharpe_5d=0.0,
+            )
+
+        mean = lambda xs: sum(xs) / len(xs) if xs else 0.0
+        std = lambda xs: math.sqrt(sum((x - mean(xs))**2 for x in xs) / len(xs)) if len(xs) > 1 else 1e-10
+
+        hit_rate = sum(1 for c in cars_3d if c > 0) / n
+        ic = _spearman_ic([s for s, _ in scores_with_car], [c for _, c in scores_with_car])
+
+        crit_mean = mean(critical_returns)
+        crit_std = std(critical_returns)
+        sharpe = (crit_mean / crit_std) * math.sqrt(252 / 5) if crit_std > 1e-10 else 0.0
+
+        return BacktestResults(
+            events_total=len(events),
+            events_with_data=n,
+            mean_car_1d=round(mean(cars_1d), 4),
+            mean_car_3d=round(mean(cars_3d), 4),
+            mean_car_5d=round(mean(cars_5d), 4),
+            mean_car_10d=round(mean(cars_10d), 4),
+            hit_rate_3d=round(hit_rate, 3),
+            information_coefficient=round(ic, 4),
+            sharpe_5d=round(sharpe, 3),
+            car_by_rank={k: round(mean(v), 4) for k, v in car_by_rank.items()},
+        )
+
+    def generate_report(self, results: BacktestResults) -> str:
+        lines = [
+            "=" * 60,
+            "EDGAR Backtest Report",
+            "=" * 60,
+            f"Events total:          {results.events_total}",
+            f"Events with data:      {results.events_with_data}",
+            f"Mean CAR(0,+1):        {results.mean_car_1d:+.2%}",
+            f"Mean CAR(0,+3):        {results.mean_car_3d:+.2%}",
+            f"Mean CAR(0,+5):        {results.mean_car_5d:+.2%}",
+            f"Mean CAR(0,+10):       {results.mean_car_10d:+.2%}",
+            f"Hit Rate (CAR3d > 0):  {results.hit_rate_3d:.1%}",
+            f"Information Coef (IC): {results.information_coefficient:.4f}",
+            f"Sharpe (CRITICAL,5d):  {results.sharpe_5d:.3f}",
+            "\nCAR by rank:",
+        ]
+        for rank in ("CRITICAL", "HIGH", "MEDIUM", "LOW"):
+            v = results.car_by_rank.get(rank)
+            if v is not None:
+                lines.append(f"  {rank:8s}: {v:+.2%}")
+        return "\n".join(lines)
+
+
+def _synthetic_events(n: int = 10, seed: int = 42) -> list[dict]:
+    """Generate synthetic events for unit testing without network."""
+    rng = random.Random(seed)
+    tickers = ["NVDA", "AAPL", "TSLA", "META", "MSFT", "AMZN", "GOOGL", "NFLX", "AMD", "ORCL"]
+    ranks = ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    events = []
+    base_date = date(2024, 1, 15)
+    for i in range(n):
+        events.append({
+            "ticker": tickers[i % len(tickers)],
+            "date": (base_date + timedelta(days=i * 7)).isoformat(),
+            "score": rng.uniform(20, 95),
+            "rank": ranks[i % len(ranks)],
+        })
+    return events
+
+
+if __name__ == "__main__":
+    bt = EDGARBacktester()
+    synthetic = _synthetic_events(10)
+    print("Synthetic events (unit test, no network):")
+    for ev in synthetic:
+        print(f"  {ev['ticker']:6s} {ev['date']}  score={ev['score']:.1f}  [{ev['rank']}]")
+
+    if _HAS_YF:
+        print("\nRunning event study with yfinance...")
+        results = bt.run_event_study(synthetic)
+        print(bt.generate_report(results))
+    else:
+        print("\nyfinance not installed — skipping live event study.")
+        print("Install with: pip install yfinance")"""
 backtester.py — Attention Gap Signal Backtester
 
 Tests whether the Attention Gap score has predictive power for
