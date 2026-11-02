@@ -1,5 +1,4 @@
 """
-news_signal_weights.py"""
 news_signal_weights.py — News Keyword Signal Weights for EDGAR Disclosure Monitor
 
 Classifies news headlines into predictive buckets and scores them by
