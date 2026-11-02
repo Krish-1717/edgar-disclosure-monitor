@@ -238,8 +238,10 @@ def run(tickers: Optional[List[str]] = None, dry_run: bool = False) -> None:
         n_companies = conn.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
         n_filings   = conn.execute("SELECT COUNT(*) FROM filings").fetchone()[0]
         print(f"\nDB now holds {n_companies} companies and {n_filings} filings.")
-        print(f"  10-K: {conn.execute('SELECT COUNT(*) FROM filings WHERE form_type=\'10-K\'').fetchone()[0]}")
-        print(f"  10-Q: {conn.execute('SELECT COUNT(*) FROM filings WHERE form_type=\'10-Q\'').fetchone()[0]}")
+        q10k = conn.execute("SELECT COUNT(*) FROM filings WHERE form_type='10-K'").fetchone()[0]
+        print(f"  10-K: {q10k}")
+        q10q = conn.execute("SELECT COUNT(*) FROM filings WHERE form_type='10-Q'").fetchone()[0]
+        print(f"  10-Q: {q10q}")
         conn.close()
 
     print("\nDay 1 Done: fetch_filings.py OK")
