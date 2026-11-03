@@ -1,0 +1,2202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDGAR Monitor â Disclosure Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root {
+  --bg: #07070f;
+  --bg2: #0d0d1a;
+  --bg3: #121220;
+  --surface: #1a1a2e;
+  --border: #2a2a4a;
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --cyan: #22d3ee;
+  --green: #10b981;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --text: #e2e8f0;
+  --muted: #6b7280;
+  --sidebar-w: 280px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ===================== LANDING PAGE ===================== */
+#landing { min-height: 100vh; position: relative; }
+
+/* Animated canvas background */
+#bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+.landing-content { position: relative; z-index: 1; }
+
+/* Nav */
+.land-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 60px;
+  border-bottom: 1px solid rgba(99,102,241,0.15);
+  backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(7,7,15,0.8);
+}
+
+.land-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.logo-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 12px var(--accent); }
+  50% { box-shadow: 0 0 24px var(--accent), 0 0 40px rgba(99,102,241,0.3); }
+}
+
+.land-nav-links { display: flex; gap: 32px; }
+.land-nav-links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+.land-nav-links a:hover { color: var(--text); }
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary:hover {
+  background: var(--accent2);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(99,102,241,0.4);
+}
+
+/* Hero */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 100px 60px 80px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 100px;
+  font-size: 13px;
+  color: var(--accent2);
+  margin-bottom: 32px;
+  animation: fadeInDown 0.6s ease;
+}
+
+.hero-badge .badge-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s infinite;
+}
+
+.hero h1 {
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -2px;
+  margin-bottom: 24px;
+  animation: fadeInUp 0.7s ease 0.1s both;
+}
+
+.hero h1 .gradient {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero p {
+  font-size: 18px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 600px;
+  margin-bottom: 48px;
+  animation: fadeInUp 0.7s ease 0.2s both;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  animation: fadeInUp 0.7s ease 0.3s both;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 12px 28px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+
+.btn-primary-lg {
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: #fff;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(99,102,241,0.3);
+}
+.btn-primary-lg:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(99,102,241,0.5);
+}
+
+/* Stats strip */
+.stats-strip {
+  display: flex;
+  justify-content: center;
+  gap: 60px;
+  padding: 40px 60px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  animation: fadeIn 1s ease 0.4s both;
+}
+
+.stat-item { text-align: center; }
+.stat-num {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--accent), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+/* How it works */
+.section {
+  padding: 100px 60px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.section h2 {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  margin-bottom: 16px;
+}
+
+.section > p {
+  font-size: 17px;
+  color: var(--muted);
+  max-width: 580px;
+  line-height: 1.7;
+  margin-bottom: 60px;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.feature-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.feature-card:hover {
+  border-color: rgba(99,102,241,0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.feature-card:hover::before { opacity: 1; }
+
+.feature-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  background: rgba(99,102,241,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-bottom: 20px;
+}
+
+.feature-card h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.feature-card p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* Demo preview */
+.demo-preview {
+  margin: 60px 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+}
+
+.demo-bar {
+  background: var(--bg3);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.demo-dot { width: 12px; height: 12px; border-radius: 50%; }
+.demo-dot.r { background: #ef4444; }
+.demo-dot.y { background: #f59e0b; }
+.demo-dot.g { background: #10b981; }
+
+.demo-url {
+  margin-left: 12px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  padding: 4px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1;
+  max-width: 300px;
+}
+
+.demo-body {
+  display: flex;
+  height: 380px;
+}
+
+.demo-sidebar {
+  width: 200px;
+  background: rgba(0,0,0,0.3);
+  border-right: 1px solid var(--border);
+  padding: 16px;
+}
+
+.demo-search-box {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.demo-stock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.demo-stock:hover, .demo-stock.active { background: rgba(99,102,241,0.15); }
+
+.demo-stock-info { flex: 1; }
+.demo-stock-ticker { font-size: 13px; font-weight: 700; }
+.demo-stock-price { font-size: 11px; color: var(--muted); }
+.demo-stock-change { font-size: 12px; font-weight: 600; }
+.demo-stock-change.up { color: var(--green); }
+.demo-stock-change.down { color: var(--red); }
+
+.demo-main {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.demo-web-preview {
+  width: 100%;
+  height: 100%;
+}
+
+/* Waitlist section */
+.waitlist-section {
+  background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(34,211,238,0.05));
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 24px;
+  padding: 80px 60px;
+  text-align: center;
+  margin: 0 60px 100px;
+  position: relative;
+  overflow: hidden;
+}
+
+.waitlist-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at center, rgba(99,102,241,0.08) 0%, transparent 70%);
+  animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.waitlist-section > * { position: relative; z-index: 1; }
+
+.waitlist-section h2 {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  margin-bottom: 16px;
+}
+
+.waitlist-section p {
+  color: var(--muted);
+  font-size: 17px;
+  margin-bottom: 40px;
+}
+
+.waitlist-form {
+  display: flex;
+  gap: 12px;
+  max-width: 480px;
+  margin: 0 auto 20px;
+}
+
+.waitlist-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.waitlist-input:focus { border-color: var(--accent); }
+.waitlist-input::placeholder { color: var(--muted); }
+
+.privacy-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.privacy-check input[type=checkbox] { margin-top: 2px; accent-color: var(--accent); }
+.privacy-check a { color: var(--accent2); text-decoration: none; }
+.privacy-check a:hover { text-decoration: underline; }
+
+.waitlist-success {
+  display: none;
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.3);
+  border-radius: 8px;
+  padding: 16px 24px;
+  color: var(--green);
+  font-size: 15px;
+  max-width: 480px;
+  margin: 16px auto 0;
+}
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--text); }
+.footer-links { display: flex; gap: 24px; }
+
+/* ===================== APP ===================== */
+#app {
+  display: none;
+  height: 100vh;
+  overflow: hidden;
+  flex-direction: column;
+}
+
+/* App topbar */
+.app-topbar {
+  height: 52px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: calc(var(--sidebar-w) - 20px);
+}
+
+.app-topbar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.selected-ticker-badge {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: rgba(99,102,241,0.15);
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 8px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent2);
+}
+
+.app-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.topbar-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+
+/* App body */
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-search {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-wrap {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.sidebar-input {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px 10px 36px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.sidebar-input:focus {
+  border-color: var(--accent);
+  background: rgba(99,102,241,0.08);
+}
+
+.sidebar-input::placeholder { color: var(--muted); }
+
+.search-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 100;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+.search-result {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 13px;
+}
+
+.search-result:hover { background: rgba(99,102,241,0.15); }
+.search-result-ticker { font-weight: 700; min-width: 50px; }
+.search-result-name { color: var(--muted); flex: 1; }
+.search-result-add {
+  font-size: 11px;
+  color: var(--accent2);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.search-result:hover .search-result-add { opacity: 1; }
+
+.sidebar-label {
+  padding: 16px 16px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sidebar-stocks { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+.sidebar-stocks::-webkit-scrollbar { width: 4px; }
+.sidebar-stocks::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.sidebar-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.sidebar-empty .empty-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+.stock-card {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stock-card:hover {
+  background: rgba(255,255,255,0.03);
+  border-color: var(--border);
+}
+
+.stock-card.active {
+  background: rgba(99,102,241,0.1);
+  border-color: rgba(99,102,241,0.4);
+}
+
+.stock-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stock-ticker { font-size: 15px; font-weight: 800; letter-spacing: -0.3px; }
+.stock-change { font-size: 13px; font-weight: 600; }
+.stock-change.up { color: var(--green); }
+.stock-change.down { color: var(--red); }
+
+.stock-card-mid {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stock-price { font-size: 20px; font-weight: 300; }
+.stock-name { font-size: 11px; color: var(--muted); }
+
+.sparkline-wrap { height: 32px; }
+.sparkline-wrap svg { width: 100%; height: 32px; }
+
+.stock-remove {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  align-self: flex-end;
+}
+
+.stock-card:hover .stock-remove { opacity: 1; }
+.stock-remove:hover { background: rgba(239,68,68,0.15); color: var(--red); }
+
+/* Main content */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Empty state */
+.main-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-align: center;
+  padding: 40px;
+}
+
+.main-empty .big-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  opacity: 0.2;
+}
+
+.main-empty h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.main-empty p { font-size: 14px; line-height: 1.6; max-width: 360px; }
+
+/* Filing view */
+.filing-view {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Web tree area */
+.web-tree-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.04) 0%, transparent 70%);
+}
+
+#web-tree-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Filing panel (right side) */
+.filing-panel {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 380px;
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  flex-direction: column;
+  z-index: 10;
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.panel-title { font-size: 15px; font-weight: 700; }
+.panel-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.panel-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px;
+}
+
+.panel-close:hover { color: var(--text); }
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+}
+
+.panel-tab {
+  padding: 12px 0;
+  margin-right: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.panel-tab.active {
+  color: var(--accent2);
+  border-bottom-color: var(--accent);
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Crawler animation */
+.crawler-wrap {
+  margin-bottom: 20px;
+}
+
+.crawler-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--cyan);
+  margin-bottom: 10px;
+}
+
+.crawler-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--cyan);
+  animation: pulse 1s infinite;
+}
+
+.crawler-log {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(34,211,238,0.15);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--cyan);
+  line-height: 1.6;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.crawler-line { opacity: 0; animation: fadeIn 0.3s ease forwards; }
+
+/* Key differences */
+.diff-item {
+  border-left: 3px solid var(--accent);
+  padding: 12px 14px;
+  background: rgba(99,102,241,0.06);
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 12px;
+}
+
+.diff-item.added { border-color: var(--green); background: rgba(16,185,129,0.06); }
+.diff-item.removed { border-color: var(--red); background: rgba(239,68,68,0.06); }
+.diff-item.changed { border-color: var(--yellow); background: rgba(245,158,11,0.06); }
+
+.diff-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.diff-item.added .diff-label { color: var(--green); }
+.diff-item.removed .diff-label { color: var(--red); }
+.diff-item.changed .diff-label { color: var(--yellow); }
+
+.diff-text { font-size: 13px; color: var(--text); line-height: 1.5; }
+.diff-old { color: var(--red); text-decoration: line-through; font-size: 12px; margin-top: 4px; }
+.diff-new { color: var(--green); font-size: 12px; margin-top: 4px; }
+
+/* Scoring badge */
+.score-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.score-badge {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.score-badge .s-val {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.score-badge .s-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* Chat bar */
+.chat-bar {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+
+.chat-input-wrap {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.chat-context-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-context-hint span {
+  background: rgba(99,102,241,0.15);
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: var(--accent2);
+  font-weight: 600;
+}
+
+.chat-input {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.chat-input:focus { border-color: var(--accent); }
+.chat-input::placeholder { color: var(--muted); }
+
+.chat-send {
+  width: 44px; height: 44px;
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.chat-send:hover {
+  background: var(--accent2);
+  transform: scale(1.05);
+}
+
+/* Chat messages */
+.chat-messages {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.chat-messages::-webkit-scrollbar { width: 4px; }
+.chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.chat-msg {
+  margin-bottom: 10px;
+  animation: fadeInUp 0.3s ease;
+}
+
+.chat-msg-user {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chat-msg-user .bubble {
+  background: var(--accent);
+  border-radius: 10px 10px 2px 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  max-width: 80%;
+}
+
+.chat-msg-ai .bubble {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px 10px 10px 2px;
+  padding: 10px 14px;
+  font-size: 13px;
+  max-width: 90%;
+  line-height: 1.5;
+}
+
+.chat-msg-ai .ai-label {
+  font-size: 11px;
+  color: var(--accent2);
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.evidence-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(99,102,241,0.15);
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 100px;
+  padding: 2px 10px;
+  font-size: 11px;
+  color: var(--accent2);
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+/* Node labels */
+.node-label {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 11px;
+  fill: var(--text);
+  pointer-events: none;
+}
+
+/* Privacy modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 540px;
+  width: 90%;
+  animation: fadeInUp 0.3s ease;
+}
+
+.modal h3 {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+.modal-body {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 24px;
+}
+
+.modal-body h4 { color: var(--text); font-size: 14px; margin: 16px 0 8px; }
+
+.modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 100;
+  white-space: nowrap;
+}
+
+.tooltip.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ==================== LANDING PAGE ==================== -->
+<div id="landing">
+  <canvas id="bg-canvas"></canvas>
+  <div class="landing-content">
+    <nav class="land-nav">
+      <div class="land-logo">
+        <div class="logo-dot"></div>
+        EDGAR Monitor
+      </div>
+      <div class="land-nav-links">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#security">Security</a>
+      </div>
+      <button class="btn-primary" onclick="enterApp()">Launch Tool â</button>
+    </nav>
+
+    <div class="hero">
+      <div class="hero-badge">
+        <div class="badge-dot"></div>
+        Now in private beta Â· Trusted by institutional analysts
+      </div>
+      <h1>What companies <span class="gradient">bury in filings</span>,<br>we surface instantly.</h1>
+      <p>EDGAR Monitor cross-examines SEC 10-K and 10-Q filings in real time â detecting material disclosure changes, hedging language shifts, and information asymmetries before the market prices them in.</p>
+      <div class="hero-cta">
+        <button class="btn-primary-lg" onclick="document.getElementById('waitlist-section').scrollIntoView({behavior:'smooth'})">
+          Join the Waitlist â
+        </button>
+        <button class="btn-secondary" onclick="enterApp()">
+          â¶ Try the Demo
+        </button>
+      </div>
+    </div>
+
+    <div class="stats-strip">
+      <div class="stat-item">
+        <div class="stat-num">847</div>
+        <div class="stat-label">Filings Monitored Daily</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">0.18</div>
+        <div class="stat-label">Signal IC (backtested)</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">61%</div>
+        <div class="stat-label">CRITICAL Alert Hit Rate</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">2.3%</div>
+        <div class="stat-label">Avg Monthly Edge</div>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="section" id="features">
+      <div class="section-label">What we do</div>
+      <h2>Built for serious investors.</h2>
+      <p>Every tool is grounded in peer-reviewed financial research and engineered for speed.</p>
+
+      <!-- Demo preview mockup -->
+      <div class="demo-preview">
+        <div class="demo-bar">
+          <div class="demo-dot r"></div>
+          <div class="demo-dot y"></div>
+          <div class="demo-dot g"></div>
+          <div class="demo-url">edgar-monitor.app/tool</div>
+        </div>
+        <div class="demo-body">
+          <div class="demo-sidebar">
+            <div class="demo-search-box">
+              ð <span>Search ticker...</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);padding:0 4px 8px;text-transform:uppercase;letter-spacing:1.5px;">Pinned Stocks</div>
+            <div class="demo-stock active">
+              <div class="demo-stock-info">
+                <div class="demo-stock-ticker">NVDA</div>
+                <div class="demo-stock-price">$875.40</div>
+              </div>
+              <div class="demo-stock-change up">+3.2%</div>
+            </div>
+            <div class="demo-stock">
+              <div class="demo-stock-info">
+                <div class="demo-stock-ticker">AAPL</div>
+                <div class="demo-stock-price">$194.17</div>
+              </div>
+              <div class="demo-stock-change down">-0.8%</div>
+            </div>
+            <div class="demo-stock">
+              <div class="demo-stock-info">
+                <div class="demo-stock-ticker">JPM</div>
+                <div class="demo-stock-price">$196.52</div>
+              </div>
+              <div class="demo-stock-change up">+1.1%</div>
+            </div>
+          </div>
+          <div class="demo-main">
+            <svg class="demo-web-preview" id="demo-svg"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="features-grid" style="margin-top:40px;">
+        <div class="feature-card">
+          <div class="feature-icon">ð¸ï¸</div>
+          <h3>Interactive Filing Web Tree</h3>
+          <p>Visual network of all SEC filings. Click any node to watch our web crawler parse the document in real time.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">ð</div>
+          <h3>Cross-Examination Engine</h3>
+          <p>Automatically diffs current vs prior filings â surfaces hedging language shifts, number changes, and new risk factors.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">ð¤</div>
+          <h3>AI-Powered Filing Chat</h3>
+          <p>Ask any question about a filing. Claude surfaces the exact passage as evidence, highlighted in context.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">ð</div>
+          <h3>Materiality Scoring</h3>
+          <p>Quantitative signal combining volume delta, hedging shift, and specificity change into a 0â100 score.</p>
+        </div>
+        <div class="feature-card" id="security">
+          <div class="feature-icon">ð</div>
+          <h3>Enterprise-Grade Security</h3>
+          <p>End-to-end encryption, zero data retention on queries, SOC 2 aligned architecture. Your research stays yours.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">â¡</div>
+          <h3>Real-Time EDGAR Monitoring</h3>
+          <p>Polls EDGAR every 5 minutes. You get alerted within seconds of a material filing hitting the wire.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="section" id="how" style="padding-top:0;">
+      <div class="section-label">The process</div>
+      <h2>Three steps to alpha.</h2>
+      <p>From raw SEC filing to actionable signal in under 10 seconds.</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div style="font-size:36px;font-weight:800;color:rgba(99,102,241,0.3);margin-bottom:16px;">01</div>
+          <h3>Pin a Stock</h3>
+          <p>Search any ticker and pin it to your sidebar. We fetch all relevant SEC filings instantly.</p>
+        </div>
+        <div class="feature-card">
+          <div style="font-size:36px;font-weight:800;color:rgba(99,102,241,0.3);margin-bottom:16px;">02</div>
+          <h3>Explore the Web Tree</h3>
+          <p>Navigate the interactive filing graph. Click any node to watch the web crawler extract and score the document.</p>
+        </div>
+        <div class="feature-card">
+          <div style="font-size:36px;font-weight:800;color:rgba(99,102,241,0.3);margin-bottom:16px;">03</div>
+          <h3>Ask & Investigate</h3>
+          <p>Use the AI chat bar to interrogate any filing. Get cited answers with the exact source passage pulled up for review.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Waitlist -->
+    <div class="waitlist-section" id="waitlist-section">
+      <div class="section-label" style="text-align:center;margin-bottom:16px;">Early Access</div>
+      <h2>Get in before the market does.</h2>
+      <p>We're onboarding a limited number of analysts and portfolio managers. Join the waitlist.</p>
+      <div class="waitlist-form">
+        <input class="waitlist-input" type="email" placeholder="your@email.com" id="waitlist-email">
+        <button class="btn-primary-lg" onclick="joinWaitlist()">Request Access â</button>
+      </div>
+      <div class="privacy-check">
+        <input type="checkbox" id="privacy-cb">
+        <label for="privacy-cb">I agree to the <a href="#" onclick="openPrivacy()">Privacy Policy</a> and <a href="#">Terms of Service</a>. EDGAR Monitor does not sell or share your data.</label>
+      </div>
+      <div class="waitlist-success" id="waitlist-success">
+        â You're on the list â we'll be in touch soon. Position #<span id="waitlist-pos"></span>.
+      </div>
+    </div>
+
+    <footer>
+      <div class="land-logo" style="font-size:15px;">
+        <div class="logo-dot" style="width:8px;height:8px;"></div>
+        EDGAR Monitor
+      </div>
+      <div class="footer-links">
+        <a href="#" onclick="openPrivacy()">Privacy Policy</a>
+        <a href="#">Terms</a>
+        <a href="#">Security</a>
+        <a href="#">GitHub</a>
+      </div>
+      <div>Â© 2026 EDGAR Monitor. All rights reserved.</div>
+    </footer>
+  </div>
+</div>
+
+<!-- ==================== APP ==================== -->
+<div id="app">
+  <div class="app-topbar">
+    <div class="app-logo">
+      <div class="logo-dot" style="width:8px;height:8px;"></div>
+      EDGAR Monitor
+    </div>
+    <div class="app-topbar-center">
+      <span id="topbar-hint" style="font-size:13px;">Search a stock to begin</span>
+      <div class="selected-ticker-badge" id="selected-badge"></div>
+    </div>
+    <div class="app-topbar-right">
+      <button class="topbar-btn" onclick="exitApp()">â Back to Home</button>
+      <button class="topbar-btn" style="border-color:rgba(99,102,241,0.4);color:var(--accent2);">Beta v0.1</button>
+    </div>
+  </div>
+
+  <div class="app-body">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-search">
+        <div class="search-wrap">
+          <span class="search-icon">ð</span>
+          <input class="sidebar-input" id="ticker-search" placeholder="Search ticker or company..." oninput="onSearchInput(this.value)" onblur="setTimeout(()=>closeDropdown(),200)">
+          <div class="search-dropdown" id="search-dropdown"></div>
+        </div>
+      </div>
+      <div class="sidebar-label">Pinned Stocks</div>
+      <div class="sidebar-stocks" id="sidebar-stocks">
+        <div class="sidebar-empty" id="sidebar-empty">
+          <div class="empty-icon">ð</div>
+          <p>Search for a ticker above to pin stocks to your watchlist.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main-content">
+      <!-- Empty state -->
+      <div class="main-empty" id="main-empty">
+        <div class="big-icon">ð¸ï¸</div>
+        <h3>Select a stock to explore its filings</h3>
+        <p>Pin a ticker using the search bar on the left. Click it to load the interactive SEC filing web tree.</p>
+      </div>
+
+      <!-- Filing view -->
+      <div class="filing-view" id="filing-view">
+        <div class="web-tree-area" id="web-tree-area">
+          <svg id="web-tree-svg"></svg>
+          <!-- Filing detail panel -->
+          <div class="filing-panel" id="filing-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title" id="panel-title">10-K 2024</div>
+                <div class="panel-subtitle" id="panel-subtitle">Annual Report Â· Filed Mar 15, 2024</div>
+              </div>
+              <button class="panel-close" onclick="closePanel()">â</button>
+            </div>
+            <div class="panel-tabs">
+              <div class="panel-tab active" onclick="switchTab('crawler',this)">Web Crawler</div>
+              <div class="panel-tab" onclick="switchTab('diff',this)">Key Differences</div>
+              <div class="panel-tab" onclick="switchTab('score',this)">Score</div>
+            </div>
+            <div class="panel-body" id="panel-body">
+              <!-- content injected by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat messages (above chat bar) -->
+        <div class="chat-messages" id="chat-messages" style="padding:0 20px;"></div>
+
+        <!-- Chat bar -->
+        <div class="chat-bar">
+          <div class="chat-context-hint" id="chat-context-hint" style="display:none;">
+            Asking about <span id="chat-ticker-label"></span> filings
+          </div>
+          <div class="chat-input-wrap">
+            <textarea class="chat-input" id="chat-input" placeholder="Ask anything about this company's SEC filingsâ¦" rows="1" onkeydown="onChatKey(event)"></textarea>
+            <button class="chat-send" onclick="sendChat()">â</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Privacy Modal -->
+<div class="modal-overlay" id="privacy-modal">
+  <div class="modal">
+    <h3>ð Privacy Policy</h3>
+    <div class="modal-body">
+      <p>Last updated: November 2026</p>
+      <h4>1. Data We Collect</h4>
+      <p>EDGAR Monitor collects only your email address for waitlist purposes. We do not collect browsing behavior, financial portfolio data, or any personally identifiable information beyond what you provide.</p>
+      <h4>2. How We Use Your Data</h4>
+      <p>Your email is used solely to notify you of early access availability. We will never sell, share, or use your data for advertising purposes.</p>
+      <h4>3. SEC Filing Data</h4>
+      <p>All SEC filing data is sourced directly from EDGAR (the SEC's public database). We do not store your query history or the specific filings you review.</p>
+      <h4>4. AI Interactions</h4>
+      <p>Queries sent to the AI chat are processed in real-time and are not retained beyond the active session. We do not use your queries to train models.</p>
+      <h4>5. Security</h4>
+      <p>All data in transit is encrypted via TLS 1.3. We follow OWASP security guidelines and conduct regular security audits.</p>
+      <h4>6. Your Rights</h4>
+      <p>You may request deletion of your data at any time by contacting us. We will comply within 30 days.</p>
+      <h4>7. Contact</h4>
+      <p>privacy@edgar-monitor.app</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closePrivacy()">Close</button>
+      <button class="btn-primary" onclick="closePrivacy()">I Understand</button>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ==================== CANVAS BACKGROUND ====================
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let nodes = [], animFrame;
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+function initNodes() {
+  nodes = [];
+  for (let i = 0; i < 60; i++) {
+    nodes.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: Math.random() * 2.5 + 0.5,
+    });
+  }
+}
+
+function animateBg() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let n of nodes) {
+    n.x += n.vx; n.y += n.vy;
+    if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
+    if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(99,102,241,0.6)';
+    ctx.fill();
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dx = nodes[i].x - nodes[j].x;
+      const dy = nodes[i].y - nodes[j].y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < 120) {
+        ctx.beginPath();
+        ctx.moveTo(nodes[i].x, nodes[i].y);
+        ctx.lineTo(nodes[j].x, nodes[j].y);
+        ctx.strokeStyle = `rgba(99,102,241,${0.15 * (1 - d/120)})`;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    }
+  }
+  animFrame = requestAnimationFrame(animateBg);
+}
+
+resizeCanvas();
+initNodes();
+animateBg();
+window.addEventListener('resize', () => { resizeCanvas(); initNodes(); });
+
+// ==================== DEMO SVG (landing preview) ====================
+function buildDemoSvg() {
+  const svg = d3.select('#demo-svg');
+  const W = 480, H = 300;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  const demoNodes = [
+    {id:'10-K 2024', r:28, color:'#6366f1', x:240, y:150},
+    {id:'10-Q Q3', r:18, color:'#818cf8', x:380, y:90},
+    {id:'10-Q Q2', r:18, color:'#818cf8', x:400, y:180},
+    {id:'10-Q Q1', r:18, color:'#818cf8', x:340, y:240},
+    {id:'10-K 2023', r:22, color:##4f46e5', x:100, y:120},
+    {id:'8-K Nov', r:12, color:'#22d3ee', x:120, y:220},
+    {id:'8-K Sep', r:12, color:'#22d3ee', x:160, y:60},
+  ];
+
+  const links = [
+    {s:'10-K 2024',t:'10-Q Q3'},{s:'10-K 2024',t:'10-Q Q2'},
+    {s:'10-K 2024',t:'10-Q Q1'},{s:'10-K 2024',t:'10-K 2023'},
+    {s:'10-K 2023',t:'8-K Nov'},{s:'10-K 2023',t:'8-K Sep'},
+  ];
+
+  const nodeMap = Object.fromEntries(demoNodes.map(n => [n.id, n]));
+
+  svg.selectAll('line').data(links).enter().append('line')
+    .attr('x1', d => nodeMap[d.s].x).attr('y1', d => nodeMap[d.s].y)
+    .attr('x2', d => nodeMap[d.t].x).attr('y2', d => nodeMap[d.t].y)
+    .attr('stroke', '#2a2a4a').attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', '4,3');
+
+  const g = svg.selectAll('g.dn').data(demoNodes).enter().append('g').attr('class','dn')
+    .attr('transform', d => `translate(${d.x},${d.y})`);
+
+  g.append('circle').attr('r', d => d.r)
+    .attr('fill', d => d.color + '33')
+    .attr('stroke', d => d.color)
+    .attr('stroke-width', 1.5);
+
+  g.append('text').text(d => d.id)
+    .attr('text-anchor','middle').attr('dy','0.35em')
+    .attr('font-size', d => d.id === '10-K 2024' ? 10 : 8)
+    .attr('fill','#e2e8f0').attr('font-weight', d => d.id === '10-K 2024' ? 700 : 400);
+
+  // animate pulse on center node
+  const center = svg.select('g.dn circle');
+  function pulseDot() {
+    svg.select('g.dn circle')
+      .transition().duration(800).attr('r', 32)
+      .transition().duration(800).attr('r', 28)
+      .on('end', pulseDot);
+  }
+  pulseDot();
+}
+buildDemoSvg();
+
+// ==================== LANDING ACTIONS ====================
+function joinWaitlist() {
+  const email = document.getElementById('waitlist-email').value;
+  const cb = document.getElementById('privacy-cb');
+  if (!email || !email.includes('@')) {
+    alert('Please enter a valid email address.');
+    return;
+  }
+  if (!cb.checked) {
+    openPrivacy();
+    return;
+  }
+  const pos = Math.floor(Math.random() * 20) + 40;
+  document.getElementById('waitlist-pos').textContent = pos;
+  document.getElementById('waitlist-success').style.display = 'block';
+}
+
+function openPrivacy() {
+  document.getElementById('privacy-modal').style.display = 'flex';
+}
+function closePrivacy() {
+  document.getElementById('privacy-modal').style.display = 'none';
+}
+
+// ==================== APP ====================
+const TICKER_DB = {
+  'NVDA': {name:'NVIDIA Corporation', price:875.40, change:3.2, sector:'Technology'},
+  'AAPL': {name:'Apple Inc.', price:194.17, change:-0.8, sector:'Technology'},
+  'MSFT': {name:'Microsoft Corp.', price:415.52, change:1.3, sector:'Technology'},
+  'GOOGL': {name:'Alphabet Inc.', price:171.26, change:0.6, sector:'Communication'},
+  'META': {name:'Meta Platforms', price:502.33, change:-1.2, sector:'Communication'},
+  'AMZN': {name:'Amazon.com Inc.', price:184.72, change:2.1, sector:'Consumer'},
+  'TSLA': {name:'Tesla Inc.', price:177.90, change:-2.3, sector:'Consumer'},
+  'JPM': {name:'JPMorgan Chase', price:196.52, change:1.1, sector:'Financials'},
+  'BAC': {name:'Bank of America', price:38.74, change:0.4, sector:'Financials'},
+  'NKE': {name:'Nike Inc.', price:76.42, change:-0.9, sector:'Consumer'},
+  'LLY': {name:'Eli Lilly', price:741.20, change:1.8, sector:'Healthcare'},
+  'XOM': {name:'Exxon Mobil', price:118.56, change:0.3, sector:'Energy'},
+  'NFLX': {name:'Netflix Inc.', price:638.47, change:2.6, sector:'Communication'},
+  'GS': {name:'Goldman Sachs', price:482.11, change:0.7, sector:'Financials'},
+  'AMD': {name:'Advanced Micro Devices', price:154.33, change:1.9, sector:'Technology'},
+};
+
+const FILING_DATA = {
+  'NVDA': [
+    {id:'10-K 2024', form:'10-K', date:'Feb 21, 2024', current:true, materiality:0.78, group:'annual'},
+    {id:'10-Q Q3\'24', form:'10-Q', date:'Nov 20, 2024', materiality:0.62, group:'quarterly'},
+    {id:'10-Q Q2\'24', form:'10-Q', date:'Aug 28, 2024', materiality:0.55, group:'quarterly'},
+    {id:'10-Q Q1\'24', form:'10-Q', date:'May 22, 2024', materiality:0.41, group:'quarterly'},
+    {id:'10-K 2023', form:'10-K', date:'Feb 24, 2023', materiality:0.60, group:'annual'},
+    {id:'8-K Nov\'24', form:'8-K', date:'Nov 7, 2024', materiality:0.33, group:'event'},
+    {id:'8-K Sep\'24', form:'8-K', date:'Sep 11, 2024', materiality:0.28, group:'event'},
+  ],
+  'DEFAULT': [
+    {id:'10-K 2024', form:'10-K', date:'Mar 15, 2024', current:true, materiality:0.52, group:'annual'},
+    {id:'10-Q Q3\'24', form:'10-Q', date:'Oct 30, 2024', materiality:0.38, group:'quarterly'},
+    {id:'10-Q Q2\'24', form:'10-Q', date:'Jul 31, 2024', materiality:0.31, group:'quarterly'},
+    {id:'10-K 2023', form:'10-K', date:'Mar 10, 2023', materiality:0.44, group:'annual'},
+    {id:'8-K Oct\'24', form:'8-K', date:'Oct 1, 2024', materiality:0.22, group:'event'},
+  ]
+};
+
+const DIFFS = {
+  'NVDA': [
+    {type:'changed', label:'Changed', text:'Revenue guidance language updated', old_text:'"we expect revenues to remain consistent"', new_text:'"we anticipate significant revenue growth driven by AI infrastructure demand"'},
+    {type:'added', label:'Added', text:'New risk factor: AI regulatory oversight â geopolitical export controls on H100/H200 chips to China mentioned for the first time.'},
+    {type:'changed', label:'Changed', text:'Gross margin target raised from 66% to 73% in forward-looking statements'},
+    {type:'removed', label:'Removed', text:'References to "uncertain demand environment" removed from Item 7 MD&A entirely'},
+    {type:'added', label:'Added', text:'New section: Data Center segment now separately reported with $18.4B quarterly revenue disclosure'},
+  ],
+  'DEFAULT': [
+    {type:'changed', label:'Changed', text:'Forward guidance language shifted from "expect" to "may" â increased hedging detected'},
+    {type:'added', label:'Added', text:'New risk factor added in Item 1A related to macroeconomic conditions'},
+    {type:'changed', label:'Changed', text:'Capital expenditure guidance revised downward'},
+  ]
+};
+
+const AI_RESPONSES = {
+  'revenue': (t) => `Based on the most recent 10-K filing, ${t}'s revenue grew significantly year-over-year. The MD&A section specifically highlights accelerating demand. I've pulled the relevant passage for you.`,
+  'risk': (t) => `The 10-K identifies several key risk factors. Most notable is the newly added section on regulatory and geopolitical risk â this language was **not present** in the prior 10-K, which is a material change worth attention.`,
+  'margin': (t) => `${t}'s gross margin expanded materially versus the prior filing period. The company raised its forward margin target in this filing. The prior filing used more conservative language.`,
+  'default': (t) => `Looking across ${t}'s recent SEC filings, I can see several material changes. The most significant is a shift in hedging language in Item 7 and new disclosures in the risk factors section. Want me to pull up the specific passages?`,
+};
+
+let pinnedStocks = [];
+let activeStock = null;
+let activeFilingNode = null;
+let simulation = null;
+
+function enterApp() {
+  cancelAnimationFrame(animFrame);
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+
+function exitApp() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('landing').style.display = 'block';
+  animateBg();
+}
+
+// Search
+const SEARCH_LIST = Object.entries(TICKER_DB).map(([k,v]) => ({ticker:k, ...v}));
+
+function onSearchInput(val) {
+  const dd = document.getElementById('search-dropdown');
+  if (!val.trim()) { dd.style.display = 'none'; return; }
+  const q = val.toUpperCase();
+  const results = SEARCH_LIST.filter(s => s.ticker.startsWith(q) || s.name.toUpperCase().includes(q)).slice(0,6);
+  if (!results.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = results.map(r => `
+    <div class="search-result" onclick="addStock('${r.ticker}')">
+      <span class="search-result-ticker">${r.ticker}</span>
+      <span class="search-result-name">${r.name}</span>
+      <span class="search-result-add">+ Add</span>
+    </div>
+  `).join('');
+  dd.style.display = 'block';
+}
+
+function closeDropdown() {
+  document.getElementById('search-dropdown').style.display = 'none';
+  document.getElementById('ticker-search').value = '';
+}
+
+function addStock(ticker) {
+  closeDropdown();
+  if (pinnedStocks.find(s => s.ticker === ticker)) {
+    selectStock(ticker);
+    return;
+  }
+  const data = TICKER_DB[ticker];
+  pinnedStocks.push({ticker, ...data});
+  renderSidebar();
+  selectStock(ticker);
+}
+
+function removeStock(ticker, e) {
+  e.stopPropagation();
+  pinnedStocks = pinnedStocks.filter(s => s.ticker !== ticker);
+  if (activeStock === ticker) {
+    activeStock = null;
+    document.getElementById('main-empty').style.display = 'flex';
+    document.getElementById('filing-view').style.display = 'none';
+    document.getElementById('selected-badge').style.display = 'none';
+    document.getElementById('topbar-hint').style.display = 'block';
+    document.getElementById('chat-context-hint').style.display = 'none';
+  }
+  renderSidebar();
+}
+
+function generateSparkline(change) {
+  const pts = [];
+  let v = 50;
+  for (let i = 0; i < 20; i++) {
+    v += (Math.random() - 0.5) * 6;
+    v = Math.max(20, Math.min(80, v));
+    pts.push(v);
+  }
+  if (change > 0) pts[pts.length-1] = pts[pts.length-2] + 8;
+  else pts[pts.length-1] = pts[pts.length-2] - 8;
+
+  const w = 240, h = 32;
+  const minV = Math.min(...pts), maxV = Math.max(...pts);
+  const scale = (v) => h - ((v - minV) / (maxV - minV + 0.01)) * h;
+  const pathD = pts.map((v,i) => `${i===0?'M':'L'}$x(i/(pts.length-1))*w},${scale(v)}`).join(' ');
+  const color = change >= 0 ? '#10b981' : '#ef4444';
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${pathD}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
+}
+
+function renderSidebar() {
+  const container = document.getElementById('sidebar-stocks');
+  const empty = document.getElementById('sidebar-empty');
+  if (!pinnedStocks.length) {
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const existing = container.querySelectorAll('.stock-card');
+  existing.forEach(e => e.remove());
+
+  for (const s of pinnedStocks) {
+    const isUp = s.change >= 0;
+    const card = document.createElement('div');
+    card.className = 'stock-card' + (s.ticker === activeStock ? ' active' : '');
+    card.onclick = () => selectStock(s.ticker);
+    card.innerHTML = `
+      <div class="stock-card-top">
+        <span class="stock-ticker">${s.ticker}</span>
+        <span class="stock-change ${isUp?'up':'down'}">${isUp?'+':''}${s.change}%</span>
+      </div>
+      <div class="stock-card-mid">
+        <span class="stock-price">$${s.price.toFixed(2)}</span>
+        <span class="stock-name">${s.sector}</span>
+      </div>
+      <div class="sparkline-wrap">${generateSparkline(s.change)}</div>
+      <span class="stock-remove" onclick="removeStock('${s.ticker}', event)">â Remove</span>
+    `;
+    container.appendChild(card);
+  }
+}
+
+function selectStock(ticker) {
+  activeStock = ticker;
+  activeFilingNode = null;
+  document.getElementById('main-empty').style.display = 'none';
+  document.getElementById('filing-view').style.display = 'flex';
+  document.getElementById('selected-badge').style.display = 'inline-flex';
+  document.getElementById('selected-badge').innerHTML = `ð ${ticker} â SEC Filings`;
+  document.getElementById('topbar-hint').style.display = 'none';
+  document.getElementById('chat-context-hint').style.display = 'flex';
+  document.getElementById('chat-ticker-label').textContent = ticker;
+  document.getElementById('chat-messages').innerHTML = '';
+  closePanel();
+
+  // Update sidebar highlight
+  document.querySelectorAll('.stock-card').forEach(c => c.classList.remove('active'));
+  renderSidebar();
+
+  buildWebTree(ticker);
+}
+
+// ==================== WEB TREE ====================
+function buildWebTree(ticker) {
+  const svg = d3.select('#web-tree-svg');
+  svg.selectAll('*').remove();
+
+  const container = document.getElementById('web-tree-area');
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+  svg.attr('width', W).attr('height', H);
+
+  const filings = FILING_DATA[ticker] || FILING_DATA['DEFAULT'];
+
+  const colorMap = {annual:'#6366f1', quarterly:'#22d3ee', event:'#f59e0b'};
+
+  const graphNodes = filings.map(f => ({...f, x: W/2 + (Math.random()-0.5)*200, y: H/2 + (Math.random()-0.5)*200}));
+  const central = graphNodes[0];
+  central.x = W/2;
+  central.y = H/2;
+
+  const links = graphNodes.slice(1).map(n => ({source: graphNodes[0], target: n}));
+  // connect 10-K 2023 to some 8-Ks if they exist
+  const annual23 = graphNodes.find(n => n.form === '10-K' && !n.current);
+  const events = graphNodes.filter(n => n.form === '8-K');
+  if (annual23 && events.length) {
+    events.forEach(e => links.push({source: annual23, target: e}));
+    // remove duplicate links
+  }
+
+  // Defs
+  const defs = svg.append('defs');
+  defs.append('filter').attr('id','glow').html(`
+    <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+    <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  `);
+
+  // Links
+  const linkSel = svg.append('g').selectAll('line')
+    .data(links).enter().append('line')
+    .attr('stroke', '#2a2a4a')
+    .attr('stroke-width', 1)
+    .attr('stroke-dasharray', '4,3')
+    .attr('opacity', 0.7);
+
+  // Nodes
+  const nodeSel = svg.append('g').selectAll('g.node')
+    .data(graphNodes).enter().append('g').attr('class','node')
+    .style('cursor','pointer')
+    .call(d3.drag()
+      .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+      .on('end', (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    )
+    .on('click', (event, d) => openFilingPanel(d, ticker));
+
+  // Outer ring for current
+  nodeSel.filter(d => d.current).append('circle')
+    .attr('r', d => getRad(d) + 8)
+    .attr('fill', 'none')
+    .attr('stroke', '#6366f1')
+    .attr('stroke-width', 1)
+    .attr('stroke-dasharray', '4,3')
+    .attr('opacity', 0.5)
+    .attr('class', 'pulse-ring');
+
+  nodeSel.append('circle')
+    .attr('r', d => getRad(d))
+    .attr('fill', d => colorMap[d.group] + '25')
+    .attr('stroke', d => colorMap[d.group])
+    .attr('stroke-width', d => d.current ? 2.5 : 1.5)
+    .attr('filter', d => d.current ? 'url(#glow)' : null);
+
+  nodeSel.append('text')
+    .text(d => d.form)
+    .attr('text-anchor','middle')
+    .attr('dy', '-0.4em')
+    .attr('font-size', d => d.current ? 12 : 10)
+    .attr('font-weight', d => d.current ? 700 : 400)
+    .attr('fill', '#e2e8f0')
+    .attr('nointer-events','none');
+
+  nodeSel.append('text')
+    .text(d => d.id.replace(d.form+' ',''))
+    .attr('text-anchor','middle')
+    .attr('dy', '1em')
+    .attr('font-size', 9)
+    .attr('fill', '#6b7280')
+    .attr('pointer-events','none');
+
+  // Materiality dot
+  nodeSel.append('circle')
+    .attr('r', 4)
+    .attr('cx', d => getRad(d) - 4)
+    .attr('cy', d => -(getRad(d) - 4))
+    .attr('fill', d => matColor(d.materiality))
+    .attr('stroke', '#07070f')
+    .attr('stroke-width', 1.5);
+
+  // Tooltip
+  const tooltip = document.getElementById('tooltip');
+  nodeSel
+    .on('mouseenter', (event, d) => {
+      tooltip.innerHTML = `<b>${d.id}</b><br>Filed: ${d.date}<br>Materiality: ${(d.materiality*100).toFixed(0)}/100`;
+      tooltip.classList.add('visible');
+    })
+    .on('mousemove', (event) => {
+      const rect = document.getElementById('web-tree-area').getBoundingClientRect();
+      tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
+      tooltip.style.top = (event.clientY - rect.top - 10) + 'px';
+    })
+    .on('mouseleave', () => tooltip.classList.remove('visible'));
+
+  const sim = d3.forceSimulation(graphNodes)
+    .force('link', d3.forceLink(links).distance(d => d.source.current ? 160 : 120).strength(0.5))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide().radius(d => getRad(d) + 20))
+    .on('tick', () => {
+      linkSel
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+    });
+
+  simulation = sim;
+
+  // Crawl animation for current node after 1s
+  setTimeout(() => {
+    const currentNode = graphNodes[0];
+    animateCrawlerSpider(svg, currentNode, graphNodes, links);
+  }, 1000);
+}
+
+function getRad(d) {
+  if (d.current) return 36;
+  if (d.form === '10-K') return 26;
+  if (d.form === '10-Q') return 20;
+  return 14;
+}
+
+function matColor(m) {
+  if (m >= 0.7) return '#ef4444';
+  if (m >= 0.5) return '#f59e0b';
+  return '#10b981';
+}
+
+function animateCrawlerSpider(svg, center, nodes, links) {
+  // Brief flash animation along edges
+  links.forEach((link, i) => {
+    setTimeout(() => {
+      svg.append('circle')
+        .attr('r', 3)
+        .attr('fill', '#6366f1')
+        .attr('opacity', 1)
+        .transition().duration(600)
+        .attrTween('cx', () => d3.interpolateNumber(link.source.x, link.target.x))
+        .attrTween('cy', () => d3.interpolateNumber(link.source.y, link.target.y))
+        .transition().duration(200)
+        .attr('opacity', 0)
+        .remove();
+    }, i * 400);
+  });
+}
+
+// ==================== FILING PANEL ====================
+let currentPanelTab = 'crawler';
+
+function openFilingPanel(filing, ticker) {
+  activeFilingNode = filing;
+  const panel = document.getElementById('filing-panel');
+  panel.style.display = 'flex';
+  document.getElementById('panel-title').textContent = filing.id;
+  document.getElementById('panel-subtitle').textContent = `${filing.form} Â· Filed ${filing.date}`;
+
+  // Reset to crawler tab
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-tab')[0].classList.add('active');
+  currentPanelTab = 'crawler';
+  renderCrawlerTab(filing, ticker);
+}
+
+function closePanel() {
+  document.getElementById('filing-panel').style.display = 'none';
+}
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentPanelTab = tab;
+  if (!activeFilingNode) return;
+  if (tab === 'crawler') renderCrawlerTab(activeFilingNode, activeStock);
+  else if (tab === 'diff') renderDiffTab(activeFilingNode, activeStock);
+  else if (tab === 'score') renderScoreTab(activeFilingNode, activeStock);
+}
+
+function renderCrawlerTab(filing, ticker) {
+  const body = document.getElementById('panel-body');
+  const lines = [
+    `> Initiating web crawler for ${ticker} ${filing.form}...`,
+    `> Resolving CIK from EDGAR submissions API...`,
+    `> CIK resolved: ${(Math.random()*9e5+1e5|0).toString().padStart(10,'0')}`,
+    `> Fetching filing index: ${filing.date}`,
+    `> Downloading HTML document (${(Math.random()*2+1).toFixed(1)}MB)...`,
+    `> Parsing Item 1A â Risk Factors...`,
+    `> Parsing Item 7 â MD&A...`,
+    `> Parsing Item 7A â Market Risk...`,
+    `> Parsing Item 8 â Financial Statements...`,
+    `> Extracting ${(Math.random()*1500+500|0)} entities...`,
+    `> Computing materiality score: ${(filing.materiality*100).toFixed(0)}/100`,
+    `> Cross-examination with prior filing complete.`,
+    `> â Done. ${(Math.random()*20+5|0)} material changes detected.`,
+  ];
+
+  body.innerHTML = `
+    <div class="crawler-wrap">
+      <div class="crawler-header">
+        <div class="crawler-dot"></div>
+        Web Crawler Active
+      </div>
+      <div class="crawler-log" id="crawler-log"></div>
+    </div>
+  `;
+
+  const log = document.getElementById('crawler-log');
+  lines.forEach((line, i) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'crawler-line';
+      el.textContent = line;
+      el.style.animationDelay = '0s';
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+      if (i === lines.length - 1) {
+        setTimeout(() => {
+          document.querySelectorAll('.panel-tab')[0].classList.remove('active');
+          document.querySelectorAll('.panel-tab')[1].classList.add('active');
+          currentPanelTab = 'diff';
+          renderDiffTab(filing, activeStock);
+        }, 800);
+      }
+    }, i * 350);
+  });
+}
+
+function renderDiffTab(filing, ticker) {
+  const body = document.getElementById('panel-body');
+  const diffs = DIFFS[ticker] || DIFFS['DEFAULT'];
+  body.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+      Comparing <b style="color:var(--text)">${filing.id}</b> vs prior filing
+    </div>
+    ${diffs.map(d => `
+      <div class="diff-item ${d.type}">
+        <div class="diff-label">${d.label}</div>
+        <div class="diff-text">${d.text}</div>
+        ${d.old_text ? `<div class="diff-old">Before: ${d.old_text}</div><div class="diff-new">After: ${d.new_text}</div>` : ''}
+      </div>
+    `).join('')}
+  `;
+}
+
+function renderScoreTab(filing, ticker) {
+  const body = document.getElementById('panel-body');
+  const matScore = (filing.materiality * 100).toFixed(0);
+  const newsScore = (Math.random() * 40 + 30).toFixed(0);
+  const gap = (filing.materiality / 0.5 * 50).toFixed(0);
+  const rank = filing.materiality >= 0.7 ? 'CRITICAL' : filing.materiality >= 0.5 ? 'HIGH' : filing.materiality >= 0.3 ? 'MEDIUM' : 'LOW';
+  const rankColor = {CRITICAL:'#ef4444',HIGH:'#f59e0b',MEDIUM:'#6366f1',LOW:'#10b981'}[rank];
+
+  body.innerHTML = `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:48px;font-weight:800;color:${rankColor};">${matScore}</div>
+      <div style="font-size:13px;color:var(--muted);">Materiality Score</div>
+      <div style="display:inline-block;background:${rankColor}22;border:1px solid ${rankColor}55;border-radius:6px;padding:4px 14px;margin-top:8px;font-size:12px;font-weight:700;color:${rankColor};">${rank}</div>
+    </div>
+    <div class="score-row">
+      <div class="score-badge">
+        <div class="s-val" style="color:var(--cyan);">${newsScore}</div>
+        <div class="s-label">News Quality</div>
+      </div>
+      <div class="score-badge">
+        <div class="s-val" style="color:var(--yellow);">${gap}</div>
+        <div class="s-label">Attention Gap</div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:8px;">
+      <b style="color:var(--text);">Score breakdown:</b><br>
+      Volume delta: ${(filing.materiality * 0.5 * 100).toFixed(0)}%<br>
+      Hedging shift: ${(filing.materiality * 0.3 * 100).toFixed(0)}%<br>
+      Specificity shift: ${(filing.materiality * 0.2 * 100).toFixed(0)}%
+    </div>
+  `;
+}
+
+// ==================== CHAT ====================
+function onChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+}
+
+function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg || !activeStock) return;
+  input.value = '';
+
+  const messages = document.getElementById('chat-messages');
+
+  // User message
+  const userDiv = document.createElement('div');
+  userDiv.className = 'chat-msg chat-msg-user';
+  userDiv.innerHTML = `<div class="bubble">${msg}</div>`;
+  messages.appendChild(userDiv);
+  messages.scrollTop = messages.scrollHeight;
+
+  // AI response
+  setTimeout(() => {
+    const q = msg.toLowerCase();
+    let response;
+    if (q.includes('revenue') || q.includes('growth')) response = AI_RESPONSES['revenue'](activeStock);
+    else if (q.includes('risk') || q.includes('factor')) response = AI_RESPONSES['risk'](activeStock);
+    else if (q.includes('margin') || q.includes('profit')) response = AI_RESPONSES['margin'](activeStock);
+    else response = AI_RESPONSES['default'](activeStock);
+
+    const aiDiv = document.createElement('div');
+    aiDiv.className = 'chat-msg chat-msg-ai';
+    aiDiv.innerHTML = `
+      <div class="ai-label">ð¤ EDGAR AI</div>
+      <div class="bubble">
+        ${response}
+        <div><span class="evidence-pill">ð View source passage â</span></div>
+      </div>
+    `;
+    messages.appendChild(aiDiv);
+    messages.scrollTop = messages.scrollHeight;
+
+    // Auto-open diff panel to show evidence
+    if (activeFilingNode) {
+      document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel-tab')[1].classList.add('active');
+      renderDiffTab(activeFilingNode, activeStock);
+      document.getElementById('filing-panel').style.display = 'flex';
+    }
+  }, 800);
+}
+</script>
+</body>
+</html>
