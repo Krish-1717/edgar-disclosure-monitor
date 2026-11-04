@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import __version__
 from .config import Settings
 from .discovery import normalize_accession
+from .export import build_company_feed
 from .storage import Store
 
 
@@ -49,6 +50,18 @@ def create_app(db_path=None, cors_origins=None) -> FastAPI:
     @app.get("/health")
     def health():
         return {"status": "ok", "version": __version__, "last_run": store.last_run()}
+
+    @app.get("/companies")
+    def companies():
+        return {"companies": store.list_companies()}
+
+    @app.get("/companies/{ticker}/feed")
+    def company_feed(ticker: str, limit: int = Query(100, ge=1, le=500)):
+        """Same payload the static export writes to companies/{TICKER}.json."""
+        feed = build_company_feed(store, ticker, limit=limit)
+        if not feed:
+            raise HTTPException(404, f"{ticker.upper()} has not been crawled yet")
+        return feed
 
     @app.get("/companies/{ticker}/filings")
     def company_filings(

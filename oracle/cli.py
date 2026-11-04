@@ -35,6 +35,11 @@ def _parser() -> argparse.ArgumentParser:
     e = sub.add_parser("extract", help="re-run 10-K/10-Q section segmentation on stored documents (offline)")
     e.add_argument("ticker", nargs="?")
 
+    x = sub.add_parser("export", help="write static JSON feeds for the GitHub Pages site")
+    x.add_argument("tickers", nargs="*", help="default: every crawled company")
+    x.add_argument("--out", type=pathlib.Path, default=pathlib.Path("data/oracle/export"),
+                   help="output folder (default data/oracle/export, gitignored)")
+
     s = sub.add_parser("serve", help="run the read API")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
@@ -94,6 +99,18 @@ def _cmd_extract(args, settings: Settings) -> int:
     return 0
 
 
+def _cmd_export(args, settings: Settings) -> int:
+    from .export import write_export
+    from .storage import Store
+
+    manifest = write_export(Store(settings.db_path), args.out, args.tickers or None)
+    for c in manifest["companies"]:
+        size = (args.out / c["feed"]).stat().st_size
+        print(f"  {c['ticker']:<6} {c['filings']:>3} filings  {size / 1024:7.1f} KB  {c['feed']}")
+    print(f"wrote {len(manifest['companies'])} feeds + index.json to {args.out}")
+    return 0
+
+
 def _cmd_serve(args, settings: Settings) -> int:
     import uvicorn
 
@@ -112,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = Settings.from_env()
         if args.db:
             settings.db_path = args.db
-        handler = {"crawl": _cmd_crawl, "filings": _cmd_filings, "extract": _cmd_extract,
+        handler = {"crawl": _cmd_crawl, "filings": _cmd_filings, "extract": _cmd_extract, "export": _cmd_export,
                    "serve": _cmd_serve}[args.command]
         return handler(args, settings)
     except ConfigError as exc:

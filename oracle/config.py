@@ -10,7 +10,8 @@ from . import TIER1_FORMS
 
 SEC_MAX_RPS = 10.0          # SEC fair-access ceiling (requests / second, all hosts)
 DEFAULT_RPS = 8.0           # stay comfortably below the ceiling
-DEFAULT_CORS = ("https://krish-1717.github.io",)
+# Pages origin + the local preview server from CLAUDE.md (python3 -m http.server 8766).
+DEFAULT_CORS = ("https://krish-1717.github.io", "http://127.0.0.1:8766", "http://localhost:8766")
 
 _EMAIL_RE = re.compile(r"[^\s@<>()]+@[^\s@<>()]+\.[A-Za-z]{2,}")
 

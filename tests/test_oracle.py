@@ -342,6 +342,86 @@ def test_api(env):
     assert "access-control-allow-origin" not in evil.headers
 
 
+# -- static export ------------------------------------------------------------------
+def test_section_change_ignores_number_only_edits():
+    base = "Revenue for the quarter was $1,234 million, driven by strong demand from data center customers worldwide today."
+    prev = base + "\n\nWe may face supply constraints from our foundry partners in the coming fiscal year and beyond that."
+    cur = (base.replace("1,234", "9,999") + "\n\nNew export controls restrict shipments of our products to certain"
+           " customers in China and may reduce our revenue materially.")
+    from oracle.export import section_change
+    ch = section_change(prev, cur)
+    assert ch["paragraphs_added"] == 1 and ch["paragraphs_removed"] == 1
+    assert ch["paragraphs_modified"] == 0          # the number-only edit counts as unchanged
+    assert ch["added_samples"][0].startswith("New export controls")
+    assert ch["change_ratio"] == round(2 / 3, 3)
+
+    period = ("There have been no material changes to the Company's market risk during the first {} months "
+              "of the fiscal year compared with the annual report on Form 10-K.")
+    same = section_change(period.format("six"), period.format("nine"))
+    assert same["change_ratio"] == 0.0
+
+    before = ("We depend on a limited number of third-party foundries to manufacture our products and any "
+              "disruption at these suppliers could delay shipments to our customers.")
+    after = ("We depend on a limited number of third-party foundries and packaging partners in Taiwan to "
+             "manufacture our products, and geopolitical tension could disrupt shipments to customers.")
+    mod = section_change(before, after)
+    assert mod["paragraphs_modified"] == 1 and mod["paragraphs_added"] == 0
+    assert mod["modified_samples"][0]["before"].startswith("We depend")   # early change: opening kept
+
+    from oracle.export import _diff_window
+    lead = " ".join(f"word{i}" for i in range(40))
+    b, a = _diff_window(lead + " old ending here", lead + " new ending here")
+    assert b.startswith("...word34") and b.endswith("old ending here") and a.endswith("new ending here")
+    assert "Taiwan" in mod["modified_samples"][0]["after"]
+
+
+def test_export_feed_matches_site_schema(env):
+    from oracle.export import write_export
+
+    crawler, store, _, _, tmp = env
+    changed_q = fx.TEN_Q_HTML.replace("QRISK-BODY Export controls may restrict sales.",
+                                      "QRISK-BODY Export controls may restrict sales. Tariffs on imported components "
+                                      "rose sharply this quarter and could reduce our gross margin materially.</p><p>" + fx.LOREM)
+    later_q = ("0001045810-25-000120", "10-Q", "2025-08-27", "2025-07-27", "nvda-20250727.htm", "")
+    docs = {"nvda-20250126.htm": fx.TEN_K_HTML.encode(), "nvda-20250126a.htm": fx.TEN_K_HTML.encode(),
+            "wk-form4_1.xml": fx.FORM4_XML, "nvda-8k.htm": fx.EIGHT_K_HTML,
+            "nvda-20250427.htm": fx.TEN_Q_HTML.encode(), "nvda-20250727.htm": changed_q.encode()}
+    with respx.mock(assert_all_called=False) as router:
+        mock_sec(router, extra=[later_q], docs=docs)
+        crawler.crawl(["NVDA"], ["10-K", "10-Q", "8-K", "4"])
+
+    out = tmp / "export"
+    manifest = write_export(store, out)
+    assert [c["ticker"] for c in manifest["companies"]] == ["NVDA"]
+    raw = (out / "companies" / "NVDA.json").read_bytes()
+    raw.decode("ascii")                                   # repo rule: site files are pure ASCII
+    feed = json.loads(raw)
+    assert feed["company"]["cik"] == "0001045810"
+    f0 = feed["filings"][0]
+    assert {"id", "form", "date", "group", "current"} <= set(f0)   # FILING_DATA fields
+    assert f0["form"] == "10-Q" and f0["date"] == "Aug 27, 2025" and f0["group"] == "quarterly"
+    assert f0["current"] is True and sum(f["current"] for f in feed["filings"]) == 1
+    assert f0["compared_to"] == "0001045810-25-000090"
+    risk = next(s for s in f0["sections"] if s["key"] == "risk_factors")
+    assert risk["change"]["paragraphs_added"] >= 1
+    assert any("Tariffs" in s for s in risk["change"]["added_samples"])
+    assert len(risk["excerpt"]) <= 600
+    mdna = next(s for s in f0["sections"] if s["key"] == "mdna")
+    assert mdna["change"]["paragraphs_added"] == 0
+    assert {f["group"] for f in feed["filings"]} == {"quarterly", "annual", "event", "insider"}
+    assert json.loads((out / "index.json").read_text())["companies"][0]["feed"] == "companies/NVDA.json"
+
+    from fastapi.testclient import TestClient
+    from oracle.api import create_app
+    api = TestClient(create_app(store.db_path))
+    live = api.get("/companies/NVDA/feed").json()
+    assert [f["accession"] for f in live["filings"]] == [f["accession"] for f in feed["filings"]]
+    assert api.get("/companies").json()["companies"][0]["ticker"] == "NVDA"
+    pre = api.options("/companies/NVDA/feed", headers={
+        "Origin": "http://127.0.0.1:8766", "Access-Control-Request-Method": "GET"})
+    assert pre.headers["access-control-allow-origin"] == "http://127.0.0.1:8766"
+
+
 # -- CLI ------------------------------------------------------------------------
 def test_cli_crawl_and_list(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ORACLE_USER_AGENT", fx.UA)
@@ -358,6 +438,8 @@ def test_cli_crawl_and_list(tmp_path, monkeypatch, capsys):
     assert "0001045810-25-000023" in listing and "mdna" in listing
     assert cli_main(["--db", str(db), "extract", "NVDA"]) == 0
     assert "re-segmented 2 filings" in capsys.readouterr().out
+    assert cli_main(["--db", str(db), "export", "--out", str(tmp_path / "feed")]) == 0
+    assert (tmp_path / "feed" / "companies" / "NVDA.json").exists()
 
 
 def test_cli_missing_user_agent(tmp_path, monkeypatch, capsys):

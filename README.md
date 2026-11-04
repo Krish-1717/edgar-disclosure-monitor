@@ -30,8 +30,11 @@ cp .env.example .env        # set ORACLE_USER_AGENT="Your Name you@example.com"
 .venv/bin/python -m oracle crawl NVDA AAPL --forms 10-K,10-Q
 .venv/bin/python -m oracle filings NVDA           # what is stored
 .venv/bin/python -m oracle extract                # re-segment stored 10-K/10-Q files (offline)
+.venv/bin/python -m oracle export                 # static JSON feeds for the Pages site
 .venv/bin/python -m oracle serve --port 8000      # API on http://127.0.0.1:8000/docs
 ```
+
+**Getting real data onto the website.** GitHub Pages is static, so visitors can't reach a FastAPI server on your machine. `python -m oracle export --out DIR` writes `DIR/index.json` plus `DIR/companies/{TICKER}.json` (pure ASCII, about 6-40 KB per company), which the site can `fetch()` from its own origin with no backend and no CORS. Each filing in a feed uses the `FILING_DATA` fields from `assets/js/app.js` (`id`, `form`, `date`, `group`, `current`) plus `accession`, `sec_url`, `index_url`, amendment info, and per-section `excerpt` and `change`. `change` compares the section with the previous filing of the same form: paragraphs added / modified / removed, `change_ratio`, `word_delta_pct`, and up to 3 `added_samples` and `modified_samples` (`{before, after}`, which matches the demo's `DIFFS`). `GET /companies/{ticker}/feed` serves the same payload live. The default output folder `data/oracle/export` is gitignored; to publish, export to a folder the site serves (for example `assets/data/oracle`) and commit it.
 
 | Stage | Module | What it does |
 |-------|--------|--------------|
@@ -39,7 +42,8 @@ cp .env.example .env        # set ORACLE_USER_AGENT="Your Name you@example.com"
 | Retrieval | `oracle/client.py`, `oracle/crawler.py` | one shared rate limiter (default 8 req/s, hard cap 10), `User-Agent` from `.env`, retries with exponential backoff + jitter on 429/5xx/transport errors (honours `Retry-After`), filing index (`index.json`) + primary document per filing, SHA-256 dedupe of identical documents. Only filings not already fetched are downloaded, so re-runs are incremental |
 | Storage | `oracle/storage.py` | SQLite tables `companies`, `filings`, `documents`, `sections`, `crawl_runs`; portable schema (see module docstring) ready to move to PostgreSQL. Files go to `data/oracle/documents/{cik}/{accession}/` (gitignored) |
 | Extraction | `oracle/extract.py` | block-aware HTML -> text (drops hidden iXBRL headers), 10-K Items 1A / 7 / 7A / 8 and 10-Q Part I Items 1-3 + Part II Item 1A, with table-of-contents and running page-header suppression; when Item 8 only cross-references the statements (e.g. NVIDIA) it falls back to Item 15. Canonical keys: `risk_factors`, `mdna`, `market_risk`, `financial_statements` |
-| API | `oracle/api.py` | `GET /companies/{ticker}/filings?form=&limit=&offset=`, `GET /filings/{accession}` (`?include_text=true`), `GET /filings/{accession}/sections/{key}`, `GET /health`. CORS allows `https://krish-1717.github.io` (override with `ORACLE_CORS_ORIGINS`) |
+| Export | `oracle/export.py` | static JSON feeds for GitHub Pages (see above) |
+| API | `oracle/api.py` | `GET /companies`, `GET /companies/{ticker}/feed`, `GET /companies/{ticker}/filings?form=&limit=&offset=`, `GET /filings/{accession}` (`?include_text=true`), `GET /filings/{accession}/sections/{key}`, `GET /health`. CORS allows `https://krish-1717.github.io` and the local preview `http://127.0.0.1:8766` (override with `ORACLE_CORS_ORIGINS`) |
 
 Crawl options: `--since YYYY-MM-DD`, `--limit N` (most recent N matching filings per ticker, default 10, `0` = all in the submissions feed), `--refresh`, `--no-extract`, `--rps`. Tests mock all HTTP (`respx`), so they never call the SEC:
 

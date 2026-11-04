@@ -147,6 +147,14 @@ class Store:
         return self._one("SELECT * FROM companies WHERE ticker = ? ORDER BY updated_at DESC LIMIT 1",
                          (ticker.strip().upper().replace(".", "-"),))
 
+    def list_companies(self) -> list[dict]:
+        return self._all(
+            """SELECT c.cik, c.ticker, c.name, c.last_crawled_at, COUNT(f.accession) AS filings,
+                      MAX(f.filing_date) AS latest_filing_date
+               FROM companies c LEFT JOIN filings f ON f.cik = c.cik
+               GROUP BY c.cik, c.ticker, c.name, c.last_crawled_at ORDER BY c.ticker"""
+        )
+
     # -- filings -----------------------------------------------------------------
     def fetched_accessions(self, cik: int) -> set[str]:
         rows = self.conn.execute(
