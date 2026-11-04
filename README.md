@@ -2,6 +2,24 @@
 
 A quantitative SEC filing intelligence system that surfaces material disclosure changes before the market prices them in.
 
+**Website:** https://krish-1717.github.io/edgar-disclosure-monitor/ &middot; **Live demo:** https://krish-1717.github.io/edgar-disclosure-monitor/app.html
+
+## Website (GitHub Pages)
+
+The static site lives at the repo root and is served by GitHub Pages from `main` / root (no build step):
+
+| File | Purpose |
+|------|---------|
+| `index.html` | Landing page: scroll-pinned cinematic hero, crawler pipeline, coverage, ORACLE vision, waitlist CTA |
+| `app.html` | Demo app: watchlist, D3 "hive" network, analysis panel, AI workspace chat (illustrative data) |
+| `privacy.html`, `terms.html` | Legal templates (must be reviewed by a lawyer) |
+| `404.html` | Custom not-found page (self-contained) |
+| `assets/js/site.js` | Cookie consent, GA4 (consent-gated), Web3Forms waitlist. **Owner placeholders:** `GA_MEASUREMENT_ID`, `WEB3FORMS_ACCESS_KEY` |
+| `assets/js/app.js` | Demo app logic and mock data (`TICKER_DB`, `FILING_DATA`, `DIFFS`) |
+| `sitemap.xml`, `robots.txt`, `site.webmanifest`, `.nojekyll` | SEO / Pages config |
+
+`frontend/edgar_v2.html` now redirects to `app.html`. Run `python3 fix_encoding.py` after editing site files to keep them pure ASCII.
+
 ## What It Does
 
 Monitors SEC EDGAR 10-K and 10-Q filings in real time, computes a materiality score for each disclosure change, cross-references news coverage to detect the **Attention Gap** — filings with high materiality but low media coverage — and alerts you when institutional-grade signals emerge.
