@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EDGAR AI â Disclosure Intelligence Platform</title>
+<title>EDGAR AI &mdash; Disclosure Intelligence Platform</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
@@ -37,13 +37,13 @@
 html{scroll-behavior:smooth;}
 body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;overflow-x:hidden;line-height:1.5;}
 
-/* ââ SCROLLBAR ââ */
+/* -- SCROLLBAR -- */
 ::-webkit-scrollbar{width:6px;height:6px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--muted2);}
 
-/* ââ KEYFRAMES ââ */
+/* -- KEYFRAMES -- */
 @keyframes pulse-glow{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0.6);}70%{box-shadow:0 0 0 8px rgba(99,102,241,0);}}
 @keyframes spin{to{transform:rotate(360deg);}}
 @keyframes fade-in-up{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
@@ -58,7 +58,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 @keyframes score-ring{from{stroke-dashoffset:283;}to{stroke-dashoffset:var(--dash-offset);}}
 @keyframes typewriter{from{width:0;}to{width:100%;}}
 
-/* ââ LANDING ââ */
+/* -- LANDING -- */
 #landing{display:block;min-height:100vh;position:relative;}
 #app{display:none;height:100vh;overflow:hidden;}
 
@@ -203,7 +203,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
   font-size:13px;color:var(--muted);
 }
 
-/* ââââââââââââââââââââââââââââ APP ââââââââââââââââââââââââââââ */
+/* ============================ APP ============================ */
 #app{display:none;height:100vh;overflow:hidden;flex-direction:column;}
 .app-layout{display:flex;height:100%;overflow:hidden;}
 
@@ -498,7 +498,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 </head>
 <body>
 
-<!-- ââââââââââââââââââââââ SVG BACKGROUND ââââââââââââââââââââââ -->
+<!-- ====================== SVG BACKGROUND ====================== -->
 <svg class="bg-svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="lg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6366f1" stop-opacity="0.5"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0.1"/></linearGradient>
@@ -514,7 +514,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
   <circle cx="1100" cy="700" r="2" fill="#6366f1" opacity="0.3"><animate attributeName="opacity" values="0.1;0.4;0.1" dur="3.5s" repeatCount="indefinite"/></circle>
 </svg>
 
-<!-- ââââââââââââââââââââââ LANDING ââââââââââââââââââââââ -->
+<!-- ====================== LANDING ====================== -->
 <div id="landing">
   <!-- NAV -->
   <nav class="land-nav">
@@ -647,7 +647,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
   </div>
 </div>
 
-<!-- ââââââââââââââââââââââ APP ââââââââââââââââââââââ -->
+<!-- ====================== APP ====================== -->
 <div id="app">
   <div class="app-layout">
     <!-- SIDEBAR -->
@@ -940,7 +940,7 @@ function sparkline(change) {
   const minV = Math.min(...pts), maxV = Math.max(...pts);
   const sx = i => (i/(pts.length-1))*W;
   const sy = v => H - ((v-minV)/(maxV-minV+0.01))*H;
-  const d = pts.map((v,i) => `${i===0?'M':'L'}${sx(i)},${sy.v)}`).join(' ');
+  const d = pts.map((v,i) => `${i===0?'M':'L'}${sx(i)},${sy(v)}`).join(' ');
   const color = change >= 0 ? '#10b981' : '#ef4444';
   return `<svg class="sc-sparkline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
@@ -959,9 +959,11 @@ function addStock(ticker) {
 function removeStock(ticker, e) {
   e.stopPropagation();
   pinnedStocks = pinnedStocks.filter(s => s.ticker !== ticker);
-  if (activeStock === ticker) {
+  if (activeStock === ticker || pinnedStocks.length === 0) {
     activeStock = null;
     activeFilingNode = null;
+    if (simulation) { simulation.stop(); simulation = null; }
+    d3.select('#web-tree-svg').selectAll('*').remove();
     document.getElementById('main-empty').style.display = 'flex';
     document.getElementById('main-content').style.display = 'none';
     document.getElementById('topbar-hint').style.display = 'inline';
