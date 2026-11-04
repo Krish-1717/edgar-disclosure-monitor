@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="bg" cx="70%" cy="40%" r="80%">
+      <stop offset="0" stop-color="#161a44"/>
+      <stop offset="0.55" stop-color="#080a17"/>
+      <stop offset="1" stop-color="#04050b"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#7c86ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#7c86ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#5eead4" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#5eead4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="900" cy="300" r="300" fill="url(#glow)"/>
+  <circle cx="1040" cy="480" r="200" fill="url(#glow2)"/>
+  <g stroke="#a5adff" stroke-opacity="0.35" stroke-width="1.5">
+    <line x1="900" y1="300" x2="790" y2="210"/><line x1="900" y1="300" x2="1010" y2="200"/>
+    <line x1="900" y1="300" x2="960" y2="430"/><line x1="900" y1="300" x2="780" y2="400"/>
+    <line x1="1010" y1="200" x2="1100" y2="280"/><line x1="960" y1="430" x2="1080" y2="470"/>
+    <line x1="790" y1="210" x2="700" y2="150"/><line x1="780" y1="400" x2="840" y2="520"/>
+    <line x1="1010" y1="200" x2="1060" y2="110"/><line x1="790" y1="210" x2="1010" y2="200"/>
+  </g>
+  <g fill="#c9ceff">
+    <circle cx="900" cy="300" r="16" fill="#eef0ff"/>
+    <circle cx="790" cy="210" r="9"/><circle cx="1010" cy="200" r="10" fill="#e3c08a"/>
+    <circle cx="960" cy="430" r="9" fill="#5eead4"/><circle cx="780" cy="400" r="8"/>
+    <circle cx="1100" cy="280" r="6"/><circle cx="1080" cy="470" r="6" fill="#5eead4"/>
+    <circle cx="700" cy="150" r="5"/><circle cx="840" cy="520" r="5"/><circle cx="1060" cy="110" r="5" fill="#e3c08a"/>
+  </g>
+  <g transform="translate(80,92)">
+    <rect width="56" height="56" rx="12" fill="#11143a"/>
+    <path d="M28 8 L45 18 L45 38 L28 48 L11 38 L11 18 Z" fill="none" stroke="#a5adff" stroke-width="3"/>
+    <circle cx="28" cy="28" r="5" fill="#eef0ff"/>
+    <text x="76" y="38" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="24" fill="#c0c7d8" letter-spacing="3">EDGAR DISCLOSURE MONITOR</text>
+  </g>
+  <text x="80" y="300" font-family="Georgia, Times New Roman, serif" font-size="76" fill="#eef1f8">Every SEC filing,</text>
+  <text x="80" y="388" font-family="Georgia, Times New Roman, serif" font-size="76" fill="#eef1f8" font-style="italic">read for what changed.</text>
+  <text x="80" y="470" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="28" fill="#a3abc0">AI disclosure intelligence: crawl, parse, diff and score.</text>
+  <text x="80" y="550" font-family="Menlo, Courier New, monospace" font-size="22" fill="#a5adff">krish-1717.github.io/edgar-disclosure-monitor</text>
+</svg>

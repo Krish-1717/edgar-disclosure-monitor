@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+<title>Live demo &mdash; EDGAR Disclosure Monitor</title>
+<meta name="description" content="Interactive demo: build a hive of SEC filers, watch the crawler discover, parse and analyze filings, and ask the AI workspace about any change. Illustrative data.">
+<link rel="canonical" href="https://krish-1717.github.io/edgar-disclosure-monitor/app.html">
+<meta name="theme-color" content="#05060c">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="EDGAR Disclosure Monitor">
+<meta property="og:title" content="EDGAR Disclosure Monitor &mdash; live demo">
+<meta property="og:description" content="Build a living network of SEC filers and ask an AI workspace what changed. Illustrative demo data.">
+<meta property="og:url" content="https://krish-1717.github.io/edgar-disclosure-monitor/app.html">
+<meta property="og:image" content="https://krish-1717.github.io/edgar-disclosure-monitor/assets/img/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="EDGAR Disclosure Monitor: Every SEC filing, read for what changed.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="EDGAR Disclosure Monitor &mdash; live demo">
+<meta name="twitter:description" content="A hive-mind network of SEC filings with an AI workspace. Illustrative data.">
+<meta name="twitter:image" content="https://krish-1717.github.io/edgar-disclosure-monitor/assets/img/og-image.jpg">
+<meta name="twitter:image:alt" content="EDGAR Disclosure Monitor: Every SEC filing, read for what changed.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="assets/css/site.css">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body class="app">
+<a class="skip-link" href="#graph-area">Skip to network</a>
+
+<div class="shell" id="shell">
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <div class="tb-left">
+      <button type="button" class="icon-btn only-mobile" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="Toggle watchlist">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
+      </button>
+      <a class="brand" href="./" aria-label="EDGAR Disclosure Monitor home">
+        <img src="assets/img/favicon.svg" alt="" width="28" height="28">
+        <span class="hide-sm">EDGAR Monitor</span>
+      </a>
+      <span class="demo-badge mono" title="All data on this page is illustrative">DEMO DATA</span>
+    </div>
+    <div class="tb-context" id="tb-context" aria-live="polite">
+      <span class="tb-hint">Add a ticker to grow the hive</span>
+    </div>
+    <div class="tb-right">
+      <a class="btn btn-ghost btn-sm hide-sm" id="tb-edgar-link" href="https://www.sec.gov/edgar/search/" target="_blank" rel="noopener">Open on EDGAR</a>
+      <a class="btn btn-cta btn-sm" href="#waitlist" data-waitlist>Get early access</a>
+    </div>
+  </header>
+
+  <!-- ============ SIDEBAR / WATCHLIST ============ -->
+  <aside class="sidebar" id="sidebar" aria-label="Watchlist">
+    <div class="sb-search">
+      <label for="ticker-search" class="sb-label">Watchlist</label>
+      <div class="search-box" role="combobox" aria-haspopup="listbox" aria-owns="search-results" aria-expanded="false" id="search-combo">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M16 16l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="ticker-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search ticker or company" aria-autocomplete="list" aria-controls="search-results">
+      </div>
+      <ul class="search-results" id="search-results" role="listbox" aria-label="Matching companies" hidden></ul>
+    </div>
+    <div class="sb-list" id="sidebar-stocks"></div>
+    <div class="sb-empty" id="sidebar-empty">
+      <p>No companies yet. Try one:</p>
+      <div class="quick" id="quick-add"></div>
+    </div>
+    <p class="sb-foot">Prices, filings and links are illustrative. Not investment advice.<br>
+      <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <button type="button" data-cookie-settings>Cookie settings</button></p>
+  </aside>
+
+  <!-- ============ MAIN: CRAWLER + HIVE ============ -->
+  <main class="main" id="main">
+    <section class="pipeline-strip" aria-label="Crawler pipeline">
+      <ol id="pipeline">
+        <li data-stage="discover"><b></b><span>Discover</span></li>
+        <li data-stage="retrieve"><b></b><span>Retrieve</span></li>
+        <li data-stage="parse"><b></b><span>Parse <small>HTML &middot; iXBRL &middot; PDF</small></span></li>
+        <li data-stage="agents"><b></b><span>AI agents <small>Financial &middot; Risk &middot; Diff &middot; Forensic</small></span></li>
+        <li data-stage="report"><b></b><span>Cited report</span></li>
+      </ol>
+      <p class="pipeline-status mono" id="pipeline-status" aria-live="polite">Idle &middot; waiting for a watchlist</p>
+    </section>
+
+    <section class="graph-area" id="graph-area" tabindex="-1" aria-label="Filing network. Each company is a cluster of filings grouped by category; shared shareholders, executives and deals connect clusters.">
+      <svg id="hive" role="group" aria-label="Hive network graph"></svg>
+      <div class="graph-empty" id="graph-empty">
+        <div class="glass ge-card">
+          <span class="eyebrow">Hive mind</span>
+          <h1>Your network is empty.</h1>
+          <p>Add companies and watch their filings cluster, connect and pulse with shared holders, executives and deals.</p>
+          <button type="button" class="btn btn-cta" id="load-demo">Load demo hive</button>
+        </div>
+      </div>
+      <div class="graph-tools">
+        <button type="button" class="icon-btn" id="fit-btn" aria-label="Fit network to view" title="Fit to view">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" class="icon-btn" id="legend-btn" aria-controls="legend" aria-expanded="true" aria-label="Toggle legend" title="Legend">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="6" cy="7" r="2" fill="currentColor"/><circle cx="6" cy="17" r="2" fill="currentColor"/><path d="M11 7h9M11 17h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="legend glass" id="legend"></div>
+      <div class="tooltip" id="tooltip" role="tooltip"></div>
+    </section>
+
+    <!-- ============ ANALYSIS PANEL ============ -->
+    <aside class="panel" id="panel" aria-label="Filing analysis" aria-hidden="true">
+      <header class="panel-head">
+        <div>
+          <div class="panel-kicker mono" id="panel-kicker"></div>
+          <h2 id="panel-title">Filing</h2>
+          <div class="panel-sub" id="panel-sub"></div>
+        </div>
+        <button type="button" class="icon-btn" id="panel-close" aria-label="Close analysis panel">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="tabs" role="tablist" aria-label="Analysis views">
+        <button type="button" role="tab" id="tab-crawler" aria-controls="panel-body" aria-selected="true" data-tab="crawler">Crawler</button>
+        <button type="button" role="tab" id="tab-diff" aria-controls="panel-body" aria-selected="false" data-tab="diff" tabindex="-1">Changes</button>
+        <button type="button" role="tab" id="tab-score" aria-controls="panel-body" aria-selected="false" data-tab="score" tabindex="-1">Scores</button>
+      </div>
+      <div class="panel-body" id="panel-body" role="tabpanel" tabindex="0"></div>
+    </aside>
+  </main>
+
+  <!-- ============ AI WORKSPACE ============ -->
+  <section class="workspace" id="workspace" aria-label="AI workspace">
+    <div class="ws-thread" id="ws-thread" hidden>
+      <div class="ws-thread-head">
+        <span class="mono small" id="ws-context">Workspace</span>
+        <button type="button" class="text-btn" id="ws-collapse" aria-expanded="true" aria-controls="chat-messages">Hide thread</button>
+      </div>
+      <div class="ws-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Conversation"></div>
+    </div>
+    <form class="composer" id="composer" autocomplete="off">
+      <div class="drop-hint" aria-hidden="true">Drop a filing to analyze it locally</div>
+      <div class="attachments" id="attachments"></div>
+      <label for="chat-input" class="sr-only">Ask the AI workspace</label>
+      <textarea id="chat-input" rows="1" maxlength="2000" placeholder="Ask about any filing, or type &quot;add NVDA&quot;"></textarea>
+      <div class="composer-row">
+        <button type="button" class="icon-btn" id="attach-btn" aria-label="Attach a document for analysis" title="Attach document (PDF, HTML, TXT, XML)">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <input type="file" id="file-input" accept=".pdf,.htm,.html,.txt,.xml,.xbrl,.json" hidden>
+        <div class="modes" role="radiogroup" aria-label="Workspace mode">
+          <button type="button" role="radio" aria-checked="true" data-mode="chat">Chat</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="research" tabindex="-1">Research</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="report" tabindex="-1">Report</button>
+        </div>
+        <div class="tool-chips" role="group" aria-label="Quick tools">
+          <button type="button" class="tool" data-prompt="What changed versus the prior filing?">Diff vs prior</button>
+          <button type="button" class="tool" data-prompt="Summarize the new risk factors.">Risk factors</button>
+          <button type="button" class="tool" data-prompt="Any notable insider activity in Forms 4 and 144?">Insider activity</button>
+          <button type="button" class="tool" data-prompt="How did forward guidance language change?">Guidance</button>
+        </div>
+        <button type="submit" class="send-btn" id="send-btn" aria-label="Send message">
+          <svg class="ic-send" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg class="ic-stop" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="assets/js/site.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

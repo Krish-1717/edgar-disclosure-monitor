@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://krish-1717.github.io/edgar-disclosure-monitor/sitemap.xml
