@@ -138,6 +138,27 @@ class Crawler:
                 log.warning("%s %s: no sections found", ref.form, ref.accession)
 
 
+def reextract(store: Store, ticker: str | None = None) -> list[tuple[str, str, int]]:
+    """Re-run section segmentation on stored 10-K / 10-Q documents (no network)."""
+    sql = ("SELECT f.accession, f.form, d.local_path FROM filings f "
+           "JOIN documents d ON d.accession = f.accession AND d.kind = 'primary' "
+           "JOIN companies c ON c.cik = f.cik "
+           "WHERE f.status = 'fetched' AND f.base_form IN ('10-K', '10-Q')")
+    params: list = []
+    if ticker:
+        sql += " AND c.ticker = ?"
+        params.append(discovery.normalize_ticker(ticker))
+    out = []
+    for row in store.conn.execute(sql + " ORDER BY f.filing_date", params).fetchall():
+        path = pathlib.Path(row["local_path"])
+        if not path.exists() or path.suffix.lower() not in (".htm", ".html"):
+            continue
+        sections = extract.segment_html(path.read_bytes(), row["form"])
+        store.save_sections(row["accession"], sections)
+        out.append((row["accession"], row["form"], len(sections)))
+    return out
+
+
 def _looks_like_html(ref, content_type: str | None) -> bool:
     name = ref.raw_primary_document.lower()
     return name.endswith((".htm", ".html")) or "html" in (content_type or "")

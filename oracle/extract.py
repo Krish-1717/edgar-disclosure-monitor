@@ -14,7 +14,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from bs4 import BeautifulSoup
+import warnings
+
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
+# Inline XBRL filings are XHTML with an <?xml?> prolog; the HTML parser is what we want.
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 # (part, item) -> (key, title).  part=None means "any part" (10-K items are unique).
 TARGETS_10K = {
@@ -22,6 +27,9 @@ TARGETS_10K = {
     (None, "7"): ("mdna", "Management's Discussion and Analysis"),
     (None, "7A"): ("market_risk", "Quantitative and Qualitative Disclosures About Market Risk"),
     (None, "8"): ("financial_statements", "Financial Statements and Supplementary Data"),
+    # Many filers (e.g. NVIDIA) put only a cross-reference under Item 8 and print the
+    # statements under Item 15; used as a fallback for financial_statements.
+    (None, "15"): ("_item15", "Exhibits and Financial Statement Schedules"),
 }
 TARGETS_10Q = {
     ("I", "1"): ("financial_statements", "Financial Statements"),
@@ -34,12 +42,12 @@ _BLOCK_TAGS = [
     "p", "div", "tr", "li", "ul", "ol", "table", "section", "article", "blockquote", "pre",
     "h1", "h2", "h3", "h4", "h5", "h6", "title", "center",
 ]
-_SPACE_RE = re.compile(r"[ \t     ​ ﻿]+")
+_SPACE_RE = re.compile(r"[ \t\u00a0\u2002\u2003\u2009\u200a\u200b\u202f\ufeff]+")
 _ITEM_RE = re.compile(
-    r"^\s*item[\s ]*(\d{1,2}[a-c]?)\s*[.:\-–—]?\s*(.{0,160})$",
+    r"^\s*item[\s\u00a0]*(\d{1,2}[a-c]?)\s*[.:\-\u2013\u2014]?\s*(.{0,160})$",
     re.IGNORECASE | re.MULTILINE,
 )
-_PART_RE = re.compile(r"^\s*part[\s ]+(iv|iii|ii|i|[1-4])\b[^\n]{0,120}$", re.IGNORECASE | re.MULTILINE)
+_PART_RE = re.compile(r"^\s*part[\s\u00a0]+(iv|iii|ii|i|[1-4])\b[^\n]{0,120}$", re.IGNORECASE | re.MULTILINE)
 _ROMAN = {"1": "I", "2": "II", "3": "III", "4": "IV"}
 MIN_SECTION_CHARS = 200
 
@@ -80,9 +88,18 @@ class _Heading:
     item: str
 
 
-def _headings(text: str) -> list[_Heading]:
-    parts = [(m.start(), _ROMAN.get(m.group(1).upper(), m.group(1).upper())) for m in _PART_RE.finditer(text)]
-    heads = []
+def _part_markers(text: str) -> list[tuple[int, str]]:
+    """PART markers where the part changes (running page headers repeat the current part)."""
+    out: list[tuple[int, str]] = []
+    for m in _PART_RE.finditer(text):
+        part = _ROMAN.get(m.group(1).upper(), m.group(1).upper())
+        if not out or out[-1][1] != part:
+            out.append((m.start(), part))
+    return out
+
+
+def _headings(text: str, parts: list[tuple[int, str]]) -> list[_Heading]:
+    heads: list[_Heading] = []
     for m in _ITEM_RE.finditer(text):
         part = None
         for pos, p in parts:
@@ -90,8 +107,20 @@ def _headings(text: str) -> list[_Heading]:
                 part = p
             else:
                 break
-        heads.append(_Heading(m.start(), m.end(), part, m.group(1).upper()))
+        item = m.group(1).upper()
+        # Running page headers ("PART II / Item 7" on every page) repeat the open item.
+        if heads and (heads[-1].part, heads[-1].item) == (part, item):
+            continue
+        heads.append(_Heading(m.start(), m.end(), part, item))
     return heads
+
+
+_RUNNING_HEADER_RE = re.compile(r"^(?:part [iv]+|item \d{1,2}[a-c]?|\d{1,3}|page \d{1,3})$", re.IGNORECASE)
+
+
+def _clean_body(body: str) -> str:
+    lines = [ln for ln in body.split("\n") if not _RUNNING_HEADER_RE.match(ln.strip())]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 def segment(text: str, form: str) -> list[dict]:
@@ -104,8 +133,9 @@ def segment(text: str, form: str) -> list[dict]:
     else:
         return []
 
-    heads = _headings(text)
-    part_starts = sorted(m.start() for m in _PART_RE.finditer(text))
+    parts = _part_markers(text)
+    heads = _headings(text, parts)
+    part_starts = [pos for pos, _ in parts]
     best: dict[str, tuple[int, str, str, str]] = {}   # key -> (length, item_label, title, body)
     for i, h in enumerate(heads):
         target = targets.get((h.part if use_part else None, h.item))
@@ -117,12 +147,18 @@ def segment(text: str, form: str) -> list[dict]:
         nxt_part = next((p for p in part_starts if h.body_start <= p < end), None)
         if nxt_part is not None:
             end = nxt_part
-        body = text[h.body_start:end].strip()
+        body = _clean_body(text[h.body_start:end])
         label = f"Part {h.part}, Item {h.item}" if use_part else f"Item {h.item}"
         if len(body) > best.get(key, (0,))[0]:
             best[key] = (len(body), label, title, body)
 
-    order = [v[0] for v in targets.values()]
+    item15 = best.pop("_item15", None)
+    fs = best.get("financial_statements")
+    if item15 and (fs is None or fs[0] < 5 * MIN_SECTION_CHARS) and item15[0] > (fs[0] if fs else 0):
+        best["financial_statements"] = (item15[0], "Item 15 (referenced from Item 8)",
+                                        "Financial Statements and Supplementary Data", item15[3])
+
+    order = [v[0] for v in targets.values() if not v[0].startswith("_")]
     return [
         {"key": k, "item": best[k][1], "title": best[k][2], "text": best[k][3]}
         for k in order if k in best and best[k][0] >= MIN_SECTION_CHARS

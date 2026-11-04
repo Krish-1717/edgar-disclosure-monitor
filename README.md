@@ -29,6 +29,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-oracle.txt
 cp .env.example .env        # set ORACLE_USER_AGENT="Your Name you@example.com"
 .venv/bin/python -m oracle crawl NVDA AAPL --forms 10-K,10-Q
 .venv/bin/python -m oracle filings NVDA           # what is stored
+.venv/bin/python -m oracle extract                # re-segment stored 10-K/10-Q files (offline)
 .venv/bin/python -m oracle serve --port 8000      # API on http://127.0.0.1:8000/docs
 ```
 
@@ -37,7 +38,7 @@ cp .env.example .env        # set ORACLE_USER_AGENT="Your Name you@example.com"
 | Discovery | `oracle/discovery.py` | ticker -> CIK (`company_tickers.json`), filing list (`submissions/CIK##########.json`), form filter (Tier 1 default: 10-K, 10-Q, 8-K, DEF 14A, 4, S-1, S-4; `/A` amendments always included), amendment versioning (`version`, `amends_accession`, best effort) |
 | Retrieval | `oracle/client.py`, `oracle/crawler.py` | one shared rate limiter (default 8 req/s, hard cap 10), `User-Agent` from `.env`, retries with exponential backoff + jitter on 429/5xx/transport errors (honours `Retry-After`), filing index (`index.json`) + primary document per filing, SHA-256 dedupe of identical documents. Only filings not already fetched are downloaded, so re-runs are incremental |
 | Storage | `oracle/storage.py` | SQLite tables `companies`, `filings`, `documents`, `sections`, `crawl_runs`; portable schema (see module docstring) ready to move to PostgreSQL. Files go to `data/oracle/documents/{cik}/{accession}/` (gitignored) |
-| Extraction | `oracle/extract.py` | block-aware HTML -> text (drops hidden iXBRL headers), 10-K Items 1A / 7 / 7A / 8 and 10-Q Part I Items 1-3 + Part II Item 1A, with table-of-contents suppression. Canonical keys: `risk_factors`, `mdna`, `market_risk`, `financial_statements` |
+| Extraction | `oracle/extract.py` | block-aware HTML -> text (drops hidden iXBRL headers), 10-K Items 1A / 7 / 7A / 8 and 10-Q Part I Items 1-3 + Part II Item 1A, with table-of-contents and running page-header suppression; when Item 8 only cross-references the statements (e.g. NVIDIA) it falls back to Item 15. Canonical keys: `risk_factors`, `mdna`, `market_risk`, `financial_statements` |
 | API | `oracle/api.py` | `GET /companies/{ticker}/filings?form=&limit=&offset=`, `GET /filings/{accession}` (`?include_text=true`), `GET /filings/{accession}/sections/{key}`, `GET /health`. CORS allows `https://krish-1717.github.io` (override with `ORACLE_CORS_ORIGINS`) |
 
 Crawl options: `--since YYYY-MM-DD`, `--limit N` (most recent N matching filings per ticker, default 10, `0` = all in the submissions feed), `--refresh`, `--no-extract`, `--rps`. Tests mock all HTTP (`respx`), so they never call the SEC:

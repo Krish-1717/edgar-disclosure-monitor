@@ -202,6 +202,31 @@ def test_10q_segmentation_uses_parts():
     assert "QLEGAL" not in secs["financial_statements"]["text"]
 
 
+def test_10k_item8_cross_reference_falls_back_to_item15():
+    html = fx.TEN_K_HTML.replace(
+        "<table><tr><td>FIN-BODY Revenue", "<p>The information required by this Item is set forth in our "
+        "Consolidated Financial Statements included in this Annual Report.</p><div>Item 9. Changes</div>"
+        "<p>None.</p><div>PART IV</div><div>Item 15. Exhibits and Financial Statement Schedules</div>"
+        "<table><tr><td>FIN-BODY Revenue")
+    secs = {s["key"]: s for s in extract.segment_html(html, "10-K")}
+    fs = secs["financial_statements"]
+    assert fs["item"] == "Item 15 (referenced from Item 8)"
+    assert "FIN-BODY" in fs["text"]
+    assert "_item15" not in secs
+
+
+def test_running_page_headers_do_not_split_sections():
+    page = "<p>{}</p><p>37</p><div>PART II</div><div>Item 7</div>"
+    mdna = "".join(page.format(f"MDNA page {i}. " + fx.LOREM) for i in range(5))
+    html = fx.TEN_K_HTML.replace(
+        "<p>MDNA-BODY Revenue grew", mdna + "<p>MDNA-TAIL Revenue grew")
+    secs = {s["key"]: s for s in extract.segment_html(html, "10-K")}
+    text = secs["mdna"]["text"]
+    assert text.startswith("MDNA page 0") and "MDNA page 4" in text and "MDNA-TAIL" in text
+    assert "\nPART II\n" not in text and "\n37\n" not in text
+    assert "MARKET-BODY" in secs["market_risk"]["text"]
+
+
 def test_non_periodic_forms_not_segmented():
     assert extract.segment_html(fx.EIGHT_K_HTML, "8-K") == []
 
@@ -331,6 +356,8 @@ def test_cli_crawl_and_list(tmp_path, monkeypatch, capsys):
     assert cli_main(["--db", str(db), "filings", "NVDA"]) == 0
     listing = capsys.readouterr().out
     assert "0001045810-25-000023" in listing and "mdna" in listing
+    assert cli_main(["--db", str(db), "extract", "NVDA"]) == 0
+    assert "re-segmented 2 filings" in capsys.readouterr().out
 
 
 def test_cli_missing_user_agent(tmp_path, monkeypatch, capsys):

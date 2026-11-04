@@ -32,6 +32,9 @@ def _parser() -> argparse.ArgumentParser:
     l.add_argument("--form")
     l.add_argument("--limit", type=int, default=20)
 
+    e = sub.add_parser("extract", help="re-run 10-K/10-Q section segmentation on stored documents (offline)")
+    e.add_argument("ticker", nargs="?")
+
     s = sub.add_parser("serve", help="run the read API")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
@@ -80,6 +83,17 @@ def _cmd_filings(args, settings: Settings) -> int:
     return 0
 
 
+def _cmd_extract(args, settings: Settings) -> int:
+    from .crawler import reextract
+    from .storage import Store
+
+    rows = reextract(Store(settings.db_path), args.ticker)
+    for acc, form, n in rows:
+        print(f"  {form:<6} {acc}  {n} sections")
+    print(f"re-segmented {len(rows)} filings")
+    return 0
+
+
 def _cmd_serve(args, settings: Settings) -> int:
     import uvicorn
 
@@ -98,7 +112,8 @@ def main(argv: list[str] | None = None) -> int:
         settings = Settings.from_env()
         if args.db:
             settings.db_path = args.db
-        handler = {"crawl": _cmd_crawl, "filings": _cmd_filings, "serve": _cmd_serve}[args.command]
+        handler = {"crawl": _cmd_crawl, "filings": _cmd_filings, "extract": _cmd_extract,
+                   "serve": _cmd_serve}[args.command]
         return handler(args, settings)
     except ConfigError as exc:
         print(f"config error: {exc}", file=sys.stderr)
