@@ -33,3 +33,8 @@ npm-debug.log*
 # Build output (if ever added)
 dist/
 build/
+
+# ORACLE crawler output (SQLite DB + downloaded filings)
+data/
+*.db
+*.sqlite3
