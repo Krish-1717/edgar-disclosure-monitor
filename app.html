@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 <title>Live demo &mdash; EDGAR Disclosure Monitor</title>
-<meta name="description" content="Interactive demo: build a hive of SEC filers, watch the crawler discover, parse and analyze filings, and ask the AI workspace about any change. Illustrative data.">
+<meta name="description" content="Interactive demo: build a hive of SEC filers across 50+ form types, watch the crawler discover, extract and analyze filings, and ask the AI workspace about any change. Illustrative data.">
 <link rel="canonical" href="https://krish-1717.github.io/edgar-disclosure-monitor/app.html">
-<meta name="theme-color" content="#05060c">
+<meta name="theme-color" content="#02030a">
 <meta name="color-scheme" content="dark">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="EDGAR Disclosure Monitor">
@@ -81,22 +81,28 @@
   <main class="main" id="main">
     <section class="pipeline-strip" aria-label="Crawler pipeline">
       <ol id="pipeline">
-        <li data-stage="discover"><b></b><span>Discover</span></li>
-        <li data-stage="retrieve"><b></b><span>Retrieve</span></li>
-        <li data-stage="parse"><b></b><span>Parse <small>HTML &middot; iXBRL &middot; PDF</small></span></li>
-        <li data-stage="agents"><b></b><span>AI agents <small>Financial &middot; Risk &middot; Diff &middot; Forensic</small></span></li>
+        <li data-stage="discover"><b></b><span>Discover <small>EDGAR index &middot; CIK map</small></span></li>
+        <li data-stage="retrieve"><b></b><span>Retrieve <small>exhibits &middot; XBRL &middot; dedupe</small></span></li>
+        <li data-stage="extract"><b></b><span>Extract <small>HTML &middot; iXBRL &middot; PDF &middot; XLSX</small></span></li>
+        <li data-stage="analyze"><b></b><span>Analyze <small>6 AI agents</small></span></li>
         <li data-stage="report"><b></b><span>Cited report</span></li>
       </ol>
+      <button type="button" class="text-btn console-btn mono" id="console-btn" aria-controls="crawl-console" aria-expanded="false">Console</button>
       <p class="pipeline-status mono" id="pipeline-status" aria-live="polite">Idle &middot; waiting for a watchlist</p>
     </section>
 
     <section class="graph-area" id="graph-area" tabindex="-1" aria-label="Filing network. Each company is a cluster of filings grouped by category; shared shareholders, executives and deals connect clusters.">
       <svg id="hive" role="group" aria-label="Hive network graph"></svg>
+      <section class="crawl-console glass" id="crawl-console" aria-label="Crawler console" hidden>
+        <header><span class="dot-live" aria-hidden="true"></span><span class="mono">oracle-crawler &middot; simulated</span><span class="mono cc-stats" id="cc-stats">idle</span>
+          <button type="button" class="icon-btn sm" id="console-close" aria-label="Close crawler console"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></header>
+        <ol class="mono" id="crawl-console-log" aria-live="off"></ol>
+      </section>
       <div class="graph-empty" id="graph-empty">
         <div class="glass ge-card">
           <span class="eyebrow">Hive mind</span>
           <h1>Your network is empty.</h1>
-          <p>Add companies and watch their filings cluster, connect and pulse with shared holders, executives and deals.</p>
+          <p>Add companies and watch the crawler pull every filing they make, across all 8 categories, into clusters that connect through shared holders, executives and deals.</p>
           <button type="button" class="btn btn-cta" id="load-demo">Load demo hive</button>
         </div>
       </div>
@@ -104,7 +110,7 @@
         <button type="button" class="icon-btn" id="fit-btn" aria-label="Fit network to view" title="Fit to view">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg>
         </button>
-        <button type="button" class="icon-btn" id="legend-btn" aria-controls="legend" aria-expanded="true" aria-label="Toggle legend" title="Legend">
+        <button type="button" class="icon-btn" id="legend-btn" aria-controls="legend" aria-expanded="true" aria-label="Toggle coverage explorer" title="Coverage explorer">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="6" cy="7" r="2" fill="currentColor"/><circle cx="6" cy="17" r="2" fill="currentColor"/><path d="M11 7h9M11 17h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         </button>
       </div>
@@ -174,6 +180,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="assets/js/site.js"></script>
+<script src="assets/js/filings.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>

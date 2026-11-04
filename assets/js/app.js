@@ -29,7 +29,11 @@
     'V': {name:'Visa Inc.', price:276.84, change:0.9, sector:'Financials', cik:'0001403161', exchange:'NYSE'},
     'MA': {name:'Mastercard Inc.', price:488.23, change:1.2, sector:'Financials', cik:'0001141391', exchange:'NYSE'},
     'UNH': {name:'UnitedHealth Group', price:528.17, change:-0.4, sector:'Healthcare', cik:'0000731766', exchange:'NYSE'},
-    'PYPL': {name:'PayPal Holdings', price:68.94, change:-1.5, sector:'Financials', cik:'0001633917', exchange:'NASDAQ'}
+    'PYPL': {name:'PayPal Holdings', price:68.94, change:-1.5, sector:'Financials', cik:'0001633917', exchange:'NASDAQ'},
+    'TSM': {name:'Taiwan Semiconductor Mfg.', price:172.40, change:1.6, sector:'Technology', cik:'0001046179', exchange:'NYSE', foreign:true},
+    'ASML': {name:'ASML Holding N.V.', price:948.10, change:-0.6, sector:'Technology', cik:'0000937966', exchange:'NASDAQ', foreign:true},
+    'XQRN': {name:'Quorenix Biotherapeutics (fictional)', price:24.18, change:6.4, sector:'Healthcare', cik:null, exchange:'DEMO', fictional:true},
+    'XHLD': {name:'Helidyne Holdings (fictional)', price:11.07, change:-4.2, sector:'Industrials', cik:null, exchange:'DEMO', fictional:true}
   };
 
   var FILING_DATA = {
@@ -78,66 +82,78 @@
   };
 
   /* =====================================================================
-   * FILING TAXONOMY
+   * FILING TAXONOMY (full catalog lives in assets/js/filings.js)
    * ===================================================================== */
-  var CATEGORIES = {
-    financial:   {label:'Financial reporting', color:'#a5adff', forms:['10-K','10-Q','8-K','20-F','6-K','11-K']},
-    governance:  {label:'Governance & proxy',  color:'#5eead4', forms:['DEF 14A','PRE 14A','DEFA14A','DEF 14C','DEFM14A','DEFC14A']},
-    insider:     {label:'Insider & ownership', color:'#e3c08a', forms:['Form 3','Form 4','Form 5','Form 144','SC 13D','SC 13G','13F-HR']},
-    offerings:   {label:'Offerings',           color:'#c4a1ff', forms:['S-1','S-3','S-4','S-8','424B3','424B5','F-1','F-3']},
-    ma:          {label:'M&A',                 color:'#ff9aae', forms:['SC TO-T','SC TO-I','SC 14D9','425','PREM14A']},
-    debt:        {label:'Debt',                color:'#7dd3fc', forms:['424B2','FWP']},
-    specialized: {label:'Specialized',         color:'#b6c0d4', forms:['SD','13F-NT','10-D','ABS-EE','NT 10-K','NT 10-Q','15-12B','15-12G']}
-  };
-  var CAT_ORDER = ['financial','governance','insider','offerings','ma','debt','specialized'];
-  var TIER1 = {'10-K':1,'10-Q':1,'8-K':1,'DEF 14A':1,'Form 4':1,'S-1':1,'S-4':1};
+  var F = window.EDM_FILINGS;
+  var CATEGORIES = F.CATEGORIES, CAT_ORDER = F.CAT_ORDER, TIERS = F.TIERS;
+  function tierOf(form) { return F.tierOf(form); }
+  function formInfo(form) { return F.BY_CODE[form] || { code: form, name: form, desc: '', cats: ['financial'], cat: 'financial', tier: 0 }; }
 
   var ENTITY_TYPES = {
-    holder: {label:'Shared shareholder', color:'#e3c08a'},
-    exec:   {label:'Shared executive / director', color:'#5eead4'},
-    deal:   {label:'Shared deal', color:'#ff9aae'}
+    holder: {label:'Shared shareholder', color:'#f5c97a'},
+    exec:   {label:'Shared executive / director', color:'#67e8f9'},
+    deal:   {label:'Shared deal', color:'#f9a8d4'}
   };
   // Illustrative relationships for the demo network. Not factual claims.
   var SHARED_ENTITIES = [
     {key:'vanguard', type:'holder', label:'Vanguard Group', note:'Passive holder reported on Schedule 13G', tickers:'*'},
     {key:'blackrock', type:'holder', label:'BlackRock', note:'Passive holder reported on Schedule 13G', tickers:'*'},
-    {key:'berkshire', type:'holder', label:'Berkshire Hathaway', note:'Position reported on Form 13F-HR', tickers:['AAPL','BAC','V','MA','AMZN']},
-    {key:'foundry', type:'deal', label:'Foundry supply agreements', note:'Shared supplier named in risk factors', tickers:['NVDA','AAPL','AMD']},
+    {key:'berkshire', type:'holder', label:'Berkshire Hathaway', note:'Position reported on Form 13F-HR', tickers:['AAPL','BAC','V','MA','AMZN','BRKB']},
+    {key:'foundry', type:'deal', label:'Foundry supply agreements', note:'Shared supplier named in risk factors', tickers:['NVDA','AAPL','AMD','TSM']},
+    {key:'litho', type:'deal', label:'Lithography equipment supply', note:'Supplier relationship described in 20-F', tickers:['ASML','TSM']},
     {key:'aicloud', type:'deal', label:'AI compute capacity deals', note:'Customer and supplier relationships disclosed in 8-Ks', tickers:['NVDA','MSFT','GOOGL','AMZN','META']},
     {key:'cards', type:'deal', label:'Card network partnerships', note:'Commercial agreements', tickers:['V','MA','PYPL','JPM','BAC']},
     {key:'pharma', type:'deal', label:'Pharmacy benefit contracts', note:'Commercial relationships', tickers:['LLY','UNH']},
     {key:'streaming', type:'deal', label:'Cloud hosting agreement', note:'Vendor relationship', tickers:['NFLX','AMZN']},
     {key:'energy', type:'deal', label:'Materials offtake agreements', note:'Supply agreements', tickers:['TSLA','XOM']},
+    {key:'merger', type:'deal', label:'Pending merger', note:'Quorenix proposes to acquire Helidyne (fictional companies)', tickers:['XQRN','XHLD']},
+    {key:'underwriter', type:'deal', label:'IPO underwriting', note:'Lead underwriter on the S-1 (fictional issuer)', tickers:['XQRN','GS','JPM']},
     {key:'board-tech', type:'exec', label:'Board interlock', note:'Director serving on several boards', tickers:['GOOGL','NFLX','META']},
     {key:'board-fin', type:'exec', label:'Board interlock', note:'Director serving on several boards', tickers:['JPM','GS','XOM']},
-    {key:'exec-move', type:'exec', label:'Executive move', note:'Former officer now at a peer company', tickers:['TSLA','NKE','AAPL']}
+    {key:'exec-move', type:'exec', label:'Executive move', note:'Former officer now at a peer company', tickers:['TSLA','NKE','AAPL']},
+    {key:'activist', type:'holder', label:'Activist fund', note:'Schedule 13D filer pushing for board seats (fictional)', tickers:['XQRN','XHLD']}
   ];
 
+  function D(type, section, text, before, after) { return { type: type, section: section, text: text, before: before || null, after: after || null }; }
   var CATEGORY_DIFFS = {
-    governance: function (t) { return [
-      {type:'changed',section:'Compensation Discussion & Analysis',text:'CEO pay ratio moved and a new performance metric was added to long-term incentives.',before:'Long-term incentive awards vest based on relative TSR.',after:'Long-term incentive awards vest based on relative TSR and a new free-cash-flow margin goal.'},
-      {type:'added',section:'Proposal 4',text:'New shareholder proposal on AI governance and disclosure.',before:null,after:'Shareholders request a report on the oversight of artificial intelligence risks by the Board...'},
-      {type:'removed',section:'Board Diversity Matrix',text:'One independent director did not stand for re-election.',before:'The Board consists of 12 directors, 11 of whom are independent.',after:null}
-    ]; },
-    insider: function (t) { return [
-      {type:'added',section:'Table I \u00b7 Non-Derivative Securities',text:'Officer sale of common stock under a Rule 10b5-1 trading plan.',before:null,after:'Code S \u00b7 12,500 shares \u00b7 weighted average price disclosed in footnote (1).'},
-      {type:'changed',section:'Beneficial ownership',text:'Direct holdings after the transaction fell versus the prior Form 4.',before:'Amount owned following reported transaction: 412,300 (D)',after:'Amount owned following reported transaction: 399,800 (D)'}
-    ]; },
-    offerings: function (t) { return [
-      {type:'added',section:'Use of Proceeds',text:'Registration covers shares reserved for the employee equity plan.',before:null,after:'The shares registered hereby are issuable under the Company\'s Amended and Restated Equity Incentive Plan...'},
-      {type:'changed',section:'Plan share reserve',text:'Share reserve increased versus the prior registration.',before:'Up to 25,000,000 shares',after:'Up to 40,000,000 shares'}
-    ]; },
-    ma: function (t) { return [
-      {type:'added',section:'Background of the Transaction',text:'New disclosure of the deal timeline and board deliberations.',before:null,after:'On several occasions during the quarter, representatives of the parties discussed a potential business combination...'},
-      {type:'changed',section:'Exchange ratio',text:'Consideration terms amended from the prior communication.',before:'0.42 shares per target share',after:'0.45 shares per target share plus cash in lieu of fractional shares'}
-    ]; },
-    debt: function (t) { return [
-      {type:'added',section:'Pricing Supplement',text:'New structured note issuance under the shelf registration.',before:null,after:'Senior unsecured notes linked to an equity index, maturing in five years...'},
-      {type:'changed',section:'Risk Factors',text:'Credit risk language expanded for the issuer.',before:'The notes are subject to our credit risk.',after:'The notes are subject to our credit risk, and actual or anticipated changes in our credit ratings may affect the market value of the notes.'}
-    ]; },
-    specialized: function (t) { return [
-      {type:'changed',section:'Specialized disclosure',text:'Scope of the specialized report changed versus the prior year.',before:'Covers 214 suppliers in scope.',after:'Covers 238 suppliers in scope; 3 smelters newly identified.'}
-    ]; }
+    governance: function () { return [
+      D('changed','Compensation Discussion & Analysis','CEO pay ratio moved and a new performance metric was added to long-term incentives.','Long-term incentive awards vest based on relative TSR.','Long-term incentive awards vest based on relative TSR and a new free-cash-flow margin goal.'),
+      D('added','Proposal 4','New shareholder proposal on AI governance and disclosure.',null,'Shareholders request a report on the oversight of artificial intelligence risks by the Board...'),
+      D('removed','Board Diversity Matrix','One independent director did not stand for re-election.','The Board consists of 12 directors, 11 of whom are independent.',null)]; },
+    insider: function () { return [
+      D('added','Table I \u00b7 Non-Derivative Securities','Officer sale of common stock under a Rule 10b5-1 trading plan.',null,'Code S \u00b7 12,500 shares \u00b7 weighted average price disclosed in footnote (1).'),
+      D('changed','Beneficial ownership','Direct holdings after the transaction fell versus the prior filing.','Amount owned following reported transaction: 412,300 (D)','Amount owned following reported transaction: 399,800 (D)')]; },
+    offerings: function () { return [
+      D('added','Use of Proceeds','Registration covers shares reserved for the employee equity plan.',null,'The shares registered hereby are issuable under the Company\'s Amended and Restated Equity Incentive Plan...'),
+      D('changed','Plan share reserve','Share reserve increased versus the prior registration.','Up to 25,000,000 shares','Up to 40,000,000 shares')]; },
+    ma: function () { return [
+      D('added','Background of the Transaction','New disclosure of the deal timeline and board deliberations.',null,'On several occasions during the quarter, representatives of the parties discussed a potential business combination...'),
+      D('changed','Exchange ratio','Consideration terms amended from the prior communication.','0.42 shares per target share','0.45 shares per target share plus cash in lieu of fractional shares')]; },
+    debt: function () { return [
+      D('added','Item 2.03 \u00b7 Direct Financial Obligation','New senior unsecured notes and a revolving credit facility amendment.',null,'The Company entered into an amendment extending the maturity of its $5.0 billion revolving credit facility to 2029...'),
+      D('changed','Covenants','Maximum leverage covenant loosened versus the prior agreement.','Consolidated leverage ratio not to exceed 3.25 to 1.00','Consolidated leverage ratio not to exceed 3.75 to 1.00')]; },
+    specialized: function () { return [
+      D('changed','Specialized disclosure','Scope of the specialized report changed versus the prior year.','Covers 214 suppliers in scope.','Covers 238 suppliers in scope; 3 smelters newly identified.')]; },
+    other: function () { return [
+      D('changed','Prepared remarks','Management tone on demand moved from cautious to confident.','"We remain cautious on the second half."','"We are seeing broad-based strength heading into the second half."'),
+      D('added','Q&A','New disclosure in analyst Q&A not present in the written release.',null,'"We expect capital expenditures to step up meaningfully next year."')]; }
+  };
+  var FORM_DIFFS = {
+    '20-F': [D('added','Item 3.D \u00b7 Risk Factors','New geopolitical and export-control risk language.',null,'Tensions across the Taiwan Strait and export controls may disrupt our operations and customers...'), D('changed','Item 5 \u00b7 Operating Review','Capacity guidance raised for advanced nodes.','We expect moderate capacity growth.','We expect to significantly expand advanced-node capacity.')],
+    '6-K': [D('added','Monthly revenue report','Monthly revenue up year over year; board approved capital appropriations.',null,'Net revenue for the month increased 33.9% year over year...')],
+    'S-1': [D('added','Prospectus Summary','Initial registration of common stock for the IPO.',null,'We are offering 12,000,000 shares of our common stock. This is our initial public offering...'), D('added','Risk Factors','Going-concern and single-product dependency risks disclosed.',null,'We have a limited operating history and depend on the success of our lead product candidate...')],
+    'NT 10-K': [D('added','Part III \u00b7 Narrative','Company cannot file its 10-K on time and cites an ongoing review of revenue recognition.',null,'The Registrant requires additional time to complete its review of certain revenue recognition matters...')],
+    'NT 10-Q': [D('added','Part III \u00b7 Narrative','Late quarterly filing notice; auditor review not complete.',null,'The Registrant was unable to complete its quarterly review without unreasonable effort or expense...')],
+    'SC TO-T': [D('added','Item 4 \u00b7 Terms of the Transaction','Third party offers to buy all outstanding shares at a premium.',null,'Offer to purchase all outstanding shares at $14.25 net per share in cash...')],
+    'SC 14D9': [D('added','Item 4 \u00b7 The Solicitation or Recommendation','Target board recommends that shareholders tender their shares.',null,'The Board unanimously recommends that stockholders accept the Offer and tender their Shares...')],
+    'SC 13D': [D('added','Item 4 \u00b7 Purpose of Transaction','Holder discloses activist intentions, seeking board seats.',null,'The Reporting Persons intend to engage with the Board regarding strategic alternatives and board composition...')],
+    'DEFC14A': [D('added','Contested solicitation','Dissident slate of three director nominees.',null,'We are soliciting your proxy to elect our three highly qualified nominees...')],
+    '15-12B': [D('added','Certification','Notice of termination of registration after the merger closes.',null,'Certification and notice of termination of registration under Section 12(b)...')],
+    '15-12G': [D('added','Certification','Suspension of reporting obligations.',null,'Certification and notice of termination of registration under Section 12(g)...')],
+    '13F-HR': [D('changed','Information table','Quarterly holdings: top position trimmed, two new positions added.','Top position: 915.6M shares','Top position: 789.4M shares')],
+    '13F-NT': [D('added','Notice','Holdings are reported by another manager on its 13F-HR.',null,'This report is a notice; all holdings are reported by other reporting managers...')],
+    '10-D': [D('changed','Distribution report','Delinquencies in the asset pool ticked up.','60+ day delinquencies: 0.82%','60+ day delinquencies: 0.97%')],
+    'ABS-EE': [D('added','Asset-level data','Asset-level exhibit filed for the trust.',null,'EX-102 asset data file covering 184,233 receivables...')]
   };
 
   /* =====================================================================
@@ -155,54 +171,73 @@
   function fmtKB(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
   function edgarUrl(t, form) {
     var info = TICKER_DB[t];
+    if (!info || !info.cik) return null;
     var type = form ? form.replace(/^Form /, '') : '';
+    if (formInfo(form).cat === 'other') type = '';
     return 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=' + info.cik + '&type=' + encodeURIComponent(type) + '&dateb=&owner=include&count=40';
   }
+  function cikOf(t) { var c = TICKER_DB[t].cik; return c || ('09' + String(hash(t) % 100000000).padStart(8, '0')); }
 
-  /* ---------- filing set per ticker: base FILING_DATA + seeded extras across categories ---------- */
+  /* ---------- filing set per ticker: base FILING_DATA + seeded filings across all 8 categories ---------- */
   var filingCache = {};
+  var FORCE = { NVDA: ['Form 5', 'Form 144'], AAPL: ['SD', 'DEFA14A', 'S-8'], MSFT: ['S-3', '11-K'], GS: ['13F-NT', '13F-HR'], BRKB: ['13F-HR'], JPM: ['13F-HR', '10-D', 'ABS-EE'], BAC: ['13F-HR', '10-D', 'ABS-EE'] };
+  var FICTIONAL_SETS = {
+    // IPO-stage biotech that also launches an acquisition: offerings, new insiders, activism, a late filing
+    XQRN: [['S-1', { current: true, mat: 0.82, m: 1 }], ['424B3', { mat: 0.55 }], ['424B5', { mat: 0.5 }], ['Form 3'], ['Form 3'], ['Form 3'], ['Form 4'], ['Form 4'],
+      ['10-Q', { mat: 0.48 }], ['10-Q', { mat: 0.4 }], ['8-K', { label: '8-K Item 5.02', item: '5.02', mat: 0.58 }], ['DEF 14A'], ['PRE 14A'], ['DEFC14A', { mat: 0.71 }],
+      ['SC 13D', { mat: 0.74 }], ['NT 10-Q', { mat: 0.62 }], ['S-4', { mat: 0.8 }], ['425'], ['425'], ['EX-99 Earnings'], ['Transcript'], ['Investor Deck'], ['Letter'], ['EX-10']],
+    // Target of a tender offer and merger, then deregistration
+    XHLD: [['10-K', { current: true, mat: 0.7, m: 2 }], ['10-Q', { mat: 0.45 }], ['NT 10-K', { mat: 0.72 }], ['8-K', { label: '8-K Item 1.01', item: '1.01', cat: 'ma', mat: 0.78 }],
+      ['8-K', { label: '8-K Item 2.03', item: '2.03', cat: 'debt', mat: 0.52 }], ['SC TO-T', { mat: 0.8 }], ['SC 14D9', { mat: 0.68 }], ['SC TO-I', { mat: 0.4 }], ['PREM14A', { mat: 0.55 }],
+      ['DEFM14A', { mat: 0.7 }], ['DEF 14C'], ['425'], ['15-12B', { mat: 0.6 }], ['15-12G', { mat: 0.5 }], ['Form 4'], ['SC 13G'], ['SC 13D', { mat: 0.66 }], ['EX-4 Debt'], ['Rating', { mat: 0.5 }], ['ARS']]
+  };
   function getFilings(t) {
     if (filingCache[t]) return filingCache[t];
-    var r = rng(hash(t));
-    var info = TICKER_DB[t];
-    var fin = info.sector === 'Financials';
-    var list = (FILING_DATA[t] || FILING_DATA.DEFAULT).map(function (f) {
-      var c = {}; for (var k in f) c[k] = f[k]; c.cat = 'financial'; return c;
-    });
-    var used = {};
-    list.forEach(function (f) { used[f.id] = 1; });
-    function add(form, cat, mat) {
-      var m = Math.floor(r() * 11), day = 1 + Math.floor(r() * 27);
-      var id = form + ' ' + MONTHS[m] + '\'24';
-      var n = 2; while (used[id]) { id = form + ' ' + MONTHS[m] + '\'24 #' + n++; }
-      used[id] = 1;
-      list.push({ id: id, form: form, date: MONTHS[m] + ' ' + day + ', 2024', cat: cat, group: cat,
-        materiality: +(mat != null ? mat : 0.12 + r() * 0.45).toFixed(2),
-        burial: +(0.1 + r() * 0.45).toFixed(2), gap: +(0.1 + r() * 0.5).toFixed(2) });
+    var r = rng(hash(t)), info = TICKER_DB[t], fin = info.sector === 'Financials';
+    var list = [], used = {}, has = {};
+    function push(f) { var n = 2, id = f.id; while (used[id]) id = f.id + ' #' + n++; used[id] = 1; f.id = id; has[f.form] = 1; list.push(f); }
+    function add(form, o) {
+      o = o || {};
+      var fi = formInfo(form), m = o.m != null ? o.m : Math.floor(r() * 11), yr = o.y || 24, cat = o.cat || fi.cat;
+      push({ id: (o.label || form) + ' ' + MONTHS[m] + '\'' + yr, form: form, item: o.item || null, date: MONTHS[m] + ' ' + (1 + Math.floor(r() * 27)) + ', 20' + yr,
+        cat: cat, group: cat, current: !!o.current,
+        materiality: +(o.mat != null ? o.mat : 0.12 + r() * 0.45).toFixed(2), burial: +(0.1 + r() * 0.45).toFixed(2), gap: +(0.1 + r() * 0.5).toFixed(2) });
     }
-    add('DEF 14A', 'governance', 0.35 + r() * 0.3);
-    if (r() < 0.55) add('DEFA14A', 'governance');
-    if (r() < 0.12) add('PRE 14A', 'governance');
-    var n4 = 2 + Math.floor(r() * 3);
-    for (var i = 0; i < n4; i++) add('Form 4', 'insider', 0.15 + r() * 0.45);
-    if (r() < 0.5) add('Form 144', 'insider');
-    add('SC 13G', 'insider', 0.18 + r() * 0.2);
-    if (r() < 0.15) add('SC 13D', 'insider', 0.5 + r() * 0.3);
-    if (fin) add('13F-HR', 'insider');
-    if (r() < 0.6) add('S-8', 'offerings');
-    if (r() < 0.3) add('S-3', 'offerings');
-    if (r() < 0.2) add('424B5', 'offerings');
-    if (fin || r() < 0.3) { add('424B2', 'debt'); add('FWP', 'debt'); }
-    if (r() < 0.2) { add('S-4', 'offerings', 0.6 + r() * 0.3); add('425', 'ma', 0.5 + r() * 0.3); }
-    if (r() < 0.1) add('SC TO-I', 'ma');
-    if ((info.sector === 'Technology' || info.sector === 'Consumer') && r() < 0.75) add('SD', 'specialized');
-    if (t === 'JPM' || t === 'BAC') { add('10-D', 'specialized'); add('ABS-EE', 'specialized'); }
-    if (r() < 0.35) add('11-K', 'financial');
+    function maybe(p, form, o) { if (r() < p) add(form, o); }
+    var i;
+    if (info.fictional) {
+      FICTIONAL_SETS[t].forEach(function (x) { add(x[0], x[1]); });
+    } else if (info.foreign) {
+      add('20-F', { current: true, m: 3, mat: 0.66 }); add('20-F', { m: 3, y: 23, mat: 0.5 });
+      for (i = 0; i < 4; i++) add('6-K', { mat: 0.2 + r() * 0.4 });
+      add(t === 'TSM' ? 'F-1' : 'F-3', { mat: 0.3 });
+      add('SC 13G');
+      add('EX-99 Earnings'); add('EX-99 Earnings'); add('Transcript'); add('Transcript'); add('Investor Deck'); add('Rating'); add('EX-10');
+    } else {
+      (FILING_DATA[t] || FILING_DATA.DEFAULT).forEach(function (f) { var c = {}; for (var k in f) c[k] = f[k]; c.cat = 'financial'; push(c); });
+      maybe(0.6, '8-K', { label: '8-K Item 2.03', item: '2.03', cat: 'debt', mat: 0.3 + r() * 0.3 });
+      maybe(0.25, '8-K', { label: '8-K Item 1.01', item: '1.01', cat: 'ma', mat: 0.4 + r() * 0.35 });
+      add('DEF 14A', { mat: 0.35 + r() * 0.3 });
+      maybe(0.55, 'DEFA14A'); maybe(0.15, 'PRE 14A');
+      var n4 = 2 + Math.floor(r() * 3);
+      for (i = 0; i < n4; i++) add('Form 4', { mat: 0.15 + r() * 0.45 });
+      maybe(0.35, 'Form 3'); maybe(0.3, 'Form 5'); maybe(0.5, 'Form 144');
+      add('SC 13G', { mat: 0.18 + r() * 0.2 });
+      maybe(0.6, 'S-8'); maybe(0.3, 'S-3'); maybe(0.25, '424B5'); maybe(0.2, '424B3');
+      if (fin || r() < 0.3) { add('424B2'); add('FWP'); }
+      maybe(0.12, 'SC TO-I');
+      if (info.sector === 'Technology' || info.sector === 'Consumer') maybe(0.75, 'SD');
+      maybe(0.4, '11-K');
+      add('ARS'); add('EX-99 Earnings'); add('EX-99 Earnings'); add('Earnings Deck'); add('Transcript'); add('Transcript');
+      maybe(0.6, 'Investor Deck'); maybe(0.4, 'Letter'); maybe(0.5, 'EX-4 Debt'); add('Rating'); add('EX-10');
+    }
+    (FORCE[t] || []).forEach(function (form) { if (!has[form]) add(form); });
     filingCache[t] = list;
     return list;
   }
   function diffsFor(f, t) {
-    if (f.cat === 'financial') return DIFFS[t] || DIFFS.DEFAULT;
+    if (FORM_DIFFS[f.form]) return FORM_DIFFS[f.form];
+    if (f.cat === 'financial' && /^(10-K|10-Q|8-K)$/.test(f.form)) return DIFFS[t] || DIFFS.DEFAULT;
     return (CATEGORY_DIFFS[f.cat] || CATEGORY_DIFFS.specialized)(t);
   }
   function currentFiling(t) { var l = getFilings(t); for (var i = 0; i < l.length; i++) if (l[i].current) return l[i]; return l[0]; }
@@ -288,7 +323,7 @@
     var sel = e.target.closest('[data-select]');
     if (sel) { selectStock(sel.getAttribute('data-select')); closeSidebarMobile(); }
   });
-  $('quick-add').innerHTML = ['NVDA', 'MSFT', 'AAPL', 'JPM', 'LLY'].map(function (t) { return '<button type="button" data-quick="' + t + '">' + t + '</button>'; }).join('');
+  $('quick-add').innerHTML = ['NVDA', 'MSFT', 'TSM', 'JPM', 'XHLD'].map(function (t) { return '<button type="button" data-quick="' + t + '">' + t + '</button>'; }).join('');
   $('quick-add').addEventListener('click', function (e) { var b = e.target.closest('[data-quick]'); if (b) addStock(b.getAttribute('data-quick')); });
 
   /* mobile drawer */
@@ -353,13 +388,13 @@
     }
     var s = TICKER_DB[activeStock];
     ctx.innerHTML = '<b>' + activeStock + '</b><span class="sep">\u00b7</span><span class="co">' + esc(s.name) + '</span><span class="sep">\u00b7</span><span class="co">' + esc(s.sector) + '</span><span class="sep">\u00b7</span><span>' + getFilings(activeStock).length + ' filings</span>';
-    link.href = edgarUrl(activeStock, '10-K');
+    link.href = edgarUrl(activeStock, '') || 'https://www.sec.gov/edgar/search/';
   }
 
   /* =====================================================================
    * CRAWLER PIPELINE STRIP (presentation only)
    * ===================================================================== */
-  var pipeToken = 0;
+  var pipeToken = 0, pipeTicker = null;
   var stageEls = Array.prototype.slice.call(document.querySelectorAll('#pipeline li'));
   function setIdleStatus() {
     stageEls.forEach(function (el) { el.classList.remove('active'); });
@@ -367,18 +402,27 @@
     $('pipeline-status').textContent = pinned.length ? 'Watching ' + pinned.length + ' compan' + (pinned.length === 1 ? 'y' : 'ies') + ' \u00b7 ' + n + ' filings indexed' : 'Idle \u00b7 waiting for a watchlist';
   }
   function runPipeline(t) {
+    if (pipeTicker && pipeTicker !== t && pinned.indexOf(pipeTicker) >= 0) growTo(pipeTicker, getFilings(pipeTicker).length, 300);
     var token = ++pipeToken;
-    var fl = getFilings(t);
-    var total = fl.length;
+    pipeTicker = t;
+    var fl = getFilings(t), total = fl.length, r = rng(hash(t + 'pipe'));
     var mb = (fl.length * 0.31 + (hash(t) % 9) / 10).toFixed(1);
+    var nDiff = fl.reduce(function (a, f) { return a + diffsFor(f, t).length; }, 0);
+    var cats = {}; fl.forEach(function (f) { cats[f.cat] = 1; });
     var steps = [
-      { s: 0, text: t + ' \u00b7 discovering accession numbers\u2026', reveal: Math.ceil(total * 0.45) },
-      { s: 1, text: t + ' \u00b7 retrieving ' + total + ' documents (' + mb + ' MB)', reveal: total },
-      { s: 2, text: t + ' \u00b7 parsing HTML \u00b7 iXBRL \u00b7 PDF' },
-      { s: 3, text: t + ' \u00b7 4 agents analyzing (financial, risk, diff, forensic)' },
-      { s: 4, text: t + ' \u00b7 cited report ready \u00b7 ' + (DIFFS[t] || DIFFS.DEFAULT).length + ' material changes' }
+      { s: 0, text: t + ' \u00b7 discovering ' + total + ' accession numbers across ' + Object.keys(cats).length + ' categories\u2026', reveal: Math.ceil(total * 0.45),
+        log: function () { return fl.slice(0, 6).map(function (f) { return ['k-disc', 'DISCOVER', t + ' ' + f.form + ' acc ' + accFor(f, t)]; }); } },
+      { s: 1, text: t + ' \u00b7 retrieving ' + total + ' documents + exhibits (' + mb + ' MB)', reveal: total,
+        log: function () { return [['k-get', 'FETCH', fl[0].form + ' ' + (300 + Math.floor(r() * 700)) + ' KB sha256:' + sha(t + 'a').slice(0, 10) + '\u2026'], ['k-get', 'FETCH', (6 + Math.floor(r() * 20)) + ' exhibits + XBRL instance'], ['k-dup', 'DEDUP', Math.floor(r() * 3) + ' duplicates skipped by hash'], ['k-retry', 'RETRY', 'HTTP 429 \u2192 backoff 2s \u2192 OK (limit 10 req/s)']]; } },
+      { s: 2, text: t + ' \u00b7 extracting HTML \u00b7 iXBRL \u00b7 PDF \u00b7 XLSX',
+        log: function () { return [['k-parse', 'EXTRACT', 'HTML ' + (40 + Math.floor(r() * 60)) + ' sections segmented'], ['k-parse', 'EXTRACT', 'iXBRL ' + (1500 + Math.floor(r() * 4000)) + ' facts \u00b7 concepts normalized'], ['k-parse', 'EXTRACT', (10 + Math.floor(r() * 30)) + ' tables rebuilt \u00b7 versions preserved']]; } },
+      { s: 3, text: t + ' \u00b7 6 agents analyzing (financial, risk, diff, forensic, corporate, external)',
+        log: function () { return F.AGENTS.map(function (a) { return ['k-agent', 'AGENT', a.name + ' \u00b7 ' + t + ' \u00b7 done']; }); } },
+      { s: 4, text: t + ' \u00b7 cited report ready \u00b7 ' + nDiff + ' material changes',
+        log: function () { return [['k-cite', 'REPORT', t + ' brief \u00b7 ' + nDiff + ' findings \u00b7 ' + (nDiff + 4) + ' citations']]; } }
     ];
     stageEls.forEach(function (el) { el.classList.remove('active', 'done'); });
+    autoOpenConsole();
     var i = 0;
     function next() {
       if (token !== pipeToken) return;
@@ -388,10 +432,33 @@
       stageEls[st.s].classList.add('active');
       $('pipeline-status').textContent = st.text;
       if (st.reveal) growTo(t, st.reveal, 760);
+      st.log().forEach(function (l, k) { setTimeout(function () { if (token === pipeToken) consoleLine(l[0], l[1], l[2]); }, reduceMotion ? 0 : k * 120); });
       i++;
-      setTimeout(next, 900);
+      setTimeout(next, reduceMotion ? 0 : 950);
     }
     next();
+  }
+
+  /* ---------- crawler console drawer ---------- */
+  var consoleEl = $('crawl-console'), consoleLog = $('crawl-console-log'), consoleBtn = $('console-btn'), consoleUserSet = false, cStats = { docs: 0, dup: 0, cite: 0 };
+  function setConsole(open, user) {
+    if (user) consoleUserSet = true;
+    consoleEl.hidden = !open;
+    consoleBtn.setAttribute('aria-expanded', String(open));
+  }
+  function autoOpenConsole() { if (!consoleUserSet && window.innerWidth > 1100) setConsole(true); }
+  consoleBtn.addEventListener('click', function () { setConsole(consoleEl.hidden, true); });
+  $('console-close').addEventListener('click', function () { setConsole(false, true); consoleBtn.focus(); });
+  function consoleLine(cls, kind, text) {
+    if (kind === 'FETCH' || kind === 'DISCOVER') cStats.docs++;
+    if (kind === 'DEDUP') cStats.dup++;
+    if (kind === 'REPORT') cStats.cite++;
+    var li = document.createElement('li');
+    li.innerHTML = '<span class="k ' + cls + '">' + kind + '</span> ' + esc(text);
+    consoleLog.appendChild(li);
+    while (consoleLog.children.length > 40) consoleLog.removeChild(consoleLog.firstChild);
+    consoleLog.scrollTop = consoleLog.scrollHeight;
+    $('cc-stats').textContent = (6 + Math.random() * 3.8).toFixed(1) + ' req/s \u00b7 ' + cStats.docs + ' docs \u00b7 ' + cStats.dup + ' deduped \u00b7 ' + cStats.cite + ' reports';
   }
   function growTo(t, n, dur) {
     var start = reveal[t] || 0;
@@ -416,7 +483,7 @@
     if (d.kind === 'hub') return 22;
     if (d.kind === 'cat') return 4;
     if (d.kind === 'entity') return 8;
-    return d.tier1 ? 8 : 5;
+    return d.tier === 1 ? 8.5 : d.tier === 2 ? 6.5 : 5;
   }
 
   function initGraph() {
@@ -482,7 +549,7 @@
     pinned.forEach(function (t, i) {
       var tg = hubTarget(i);
       var hub = node('hub:' + t, { kind: 'hub', ticker: t, tx: tg.x, ty: tg.y, label: t }, nodeMap['hub:' + t] ? null : tg);
-      var fl = getFilings(t).slice(0, reveal[t] || 0);
+      var fl = getFilings(t).slice(0, reveal[t] || 0).filter(visibleFiling);
       var cats = {};
       fl.forEach(function (f, k) {
         if (!cats[f.cat]) {
@@ -490,7 +557,7 @@
           cats[f.cat] = node('cat:' + t + ':' + f.cat, { kind: 'cat', ticker: t, cat: f.cat, tx: tg.x + Math.cos(a) * 60, ty: tg.y + Math.sin(a) * 60 }, hub);
           links.push({ id: 'hc:' + t + ':' + f.cat, source: hub.id, target: cats[f.cat].id, kind: 'hc', cat: f.cat });
         }
-        var fn = node('f:' + t + ':' + f.id, { kind: 'filing', ticker: t, cat: f.cat, filing: f, tier1: !!TIER1[f.form], tx: cats[f.cat].tx, ty: cats[f.cat].ty }, cats[f.cat]);
+        var fn = node('f:' + t + ':' + f.id, { kind: 'filing', ticker: t, cat: f.cat, filing: f, tier: tierOf(f.form), tx: cats[f.cat].tx, ty: cats[f.cat].ty }, cats[f.cat]);
         links.push({ id: 'cf:' + t + ':' + f.id, source: cats[f.cat].id, target: fn.id, kind: 'cf', cat: f.cat });
       });
     });
@@ -519,7 +586,7 @@
     var shared = gLinksData.filter(function (l) { return l.kind === 'shared'; });
 
     gLinks.selectAll('line').data(normal, function (d) { return d.id; }).join(
-      function (en) { return en.append('line').attr('stroke', function (d) { return d.kind === 'hc' ? 'rgba(165,173,255,0.35)' : CATEGORIES[d.cat].color; })
+      function (en) { return en.append('line').attr('stroke', function (d) { return d.kind === 'hc' ? 'rgba(168,180,255,0.35)' : CATEGORIES[d.cat].color; })
         .attr('stroke-width', function (d) { return d.kind === 'hc' ? 1.2 : 0.8; }).attr('opacity', 0)
         .call(function (s) { s.transition().duration(reduceMotion ? 0 : 900).attr('opacity', function (d) { return d.kind === 'hc' ? 1 : 0.32; }); }); },
       function (up) { return up; },
@@ -549,10 +616,11 @@
         g.append('circle').attr('class', 'focus-ring').attr('r', 12);
       } else {
         var c = CATEGORIES[d.cat].color;
-        if (d.tier1) g.append('circle').attr('r', 11.5).attr('fill', 'none').attr('stroke', '#eef1f8').attr('stroke-opacity', 0.75).attr('stroke-width', 1.1).attr('filter', 'url(#soft-glow)');
-        g.append('circle').attr('class', 'core').attr('r', nodeR(d)).attr('fill', c).attr('fill-opacity', d.tier1 ? 0.95 : 0.7);
-        if (d.tier1) g.append('text').text(d.filing.form.replace('Form ', 'F')).attr('text-anchor', 'middle').attr('dy', 22).attr('font-size', 8.5).attr('fill', '#949db2');
-        g.append('circle').attr('class', 'focus-ring').attr('r', d.tier1 ? 15 : 9);
+        if (d.tier === 1) g.append('circle').attr('r', 12).attr('fill', 'none').attr('stroke', '#f5c97a').attr('stroke-opacity', 0.85).attr('stroke-width', 1.2).attr('filter', 'url(#soft-glow)');
+        else if (d.tier === 2) g.append('circle').attr('r', 9).attr('fill', 'none').attr('stroke', c).attr('stroke-opacity', 0.55).attr('stroke-width', 0.9);
+        g.append('circle').attr('class', 'core').attr('r', nodeR(d)).attr('fill', c).attr('fill-opacity', d.tier === 1 ? 0.95 : d.tier === 2 ? 0.85 : 0.65);
+        if (d.tier === 1) g.append('text').text(d.filing.form.replace('Form ', 'F')).attr('text-anchor', 'middle').attr('dy', 23).attr('font-size', 8.5).attr('fill', '#98a2c4');
+        g.append('circle').attr('class', 'focus-ring').attr('r', d.tier === 1 ? 16 : 11);
       }
     });
     en.filter(function (d) { return d.kind !== 'cat'; })
@@ -579,6 +647,8 @@
     clearTimeout(updateGraph.fitT);
     updateGraph.fitT = setTimeout(fit, reduceMotion ? 0 : 900);
     if (activeStock) highlightCluster(activeStock);
+    applyHighlight();
+    updateExplorer();
   }
 
   function ticked() {
@@ -592,9 +662,10 @@
     measure();
     var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     gNodesData.forEach(function (n) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); });
-    var pad = 70, bw = Math.max(1, x1 - x0) + pad * 2, bh = Math.max(1, y1 - y0) + pad * 2;
-    var k = Math.min(1.5, W / bw, H / bh);
-    var tx = W / 2 - k * (x0 + x1) / 2, ty = H / 2 - k * (y0 + y1) / 2;
+    var lg = $('legend'), left = (!lg.hidden && W > 900) ? lg.offsetWidth + 16 : 0, uw = W - left;
+    var pad = 50, bw = Math.max(1, x1 - x0) + pad * 2, bh = Math.max(1, y1 - y0) + pad * 2;
+    var k = Math.min(1.5, uw / bw, H / bh);
+    var tx = left + uw / 2 - k * (x0 + x1) / 2, ty = H / 2 - k * (y0 + y1) / 2;
     svg.transition().duration(reduceMotion ? 0 : 1100).ease(d3.easeCubicInOut).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
   }
 
@@ -628,7 +699,7 @@
     var html;
     if (d.kind === 'hub') { var s = TICKER_DB[d.ticker]; html = '<b>' + d.ticker + '</b> \u00b7 ' + esc(s.name) + '<br>' + getFilings(d.ticker).length + ' filings \u00b7 ' + esc(s.sector); }
     else if (d.kind === 'entity') html = '<b>' + esc(d.label) + '</b><br>' + esc(ENTITY_TYPES[d.etype].label) + ' \u00b7 ' + d.tickers.join(', ') + '<br><span style="color:#949db2">' + esc(d.note) + ' (illustrative)</span>';
-    else html = '<b>' + esc(d.filing.id) + '</b>' + (d.tier1 ? ' \u00b7 Tier 1' : '') + '<br>' + esc(CATEGORIES[d.cat].label) + '<br>Filed ' + esc(d.filing.date) + ' \u00b7 Materiality ' + Math.round(d.filing.materiality * 100);
+    else html = '<b>' + esc(d.filing.id) + '</b>' + (d.tier ? ' \u00b7 Tier ' + d.tier : '') + '<br>' + esc(formInfo(d.filing.form).name) + ' \u00b7 ' + esc(CATEGORIES[d.cat].label) + '<br>Filed ' + esc(d.filing.date) + ' \u00b7 Materiality ' + Math.round(d.filing.materiality * 100);
     tooltip.innerHTML = html;
     tooltip.classList.add('visible');
     if (ev.type === 'focus') {
@@ -644,15 +715,98 @@
   }
   function hideTip() { tooltip.classList.remove('visible'); }
 
+  /* ---------- coverage explorer (legend + filters + form finder) ---------- */
+  var hiddenCats = {}, tierFilter = 'all', hlForm = null;
+  function visibleFiling(f) {
+    if (hiddenCats[f.cat]) return false;
+    if (tierFilter === 'all') return true;
+    var tr = tierOf(f.form);
+    return tierFilter === 'std' ? !tr : String(tr) === tierFilter;
+  }
+  function watchCounts() {
+    var byForm = {}, byCat = {};
+    pinned.forEach(function (t) { getFilings(t).slice(0, reveal[t] || 0).forEach(function (f) { byForm[f.form] = (byForm[f.form] || 0) + 1; byCat[f.cat] = (byCat[f.cat] || 0) + 1; }); });
+    return { byForm: byForm, byCat: byCat };
+  }
   function renderLegend() {
     var lg = $('legend');
-    lg.innerHTML = '<h2>Filing categories</h2><ul>' + CAT_ORDER.map(function (c) {
-      return '<li><i style="background:' + CATEGORIES[c].color + '"></i>' + esc(CATEGORIES[c].label) + '</li>';
-    }).join('') + '<li class="tier"><i></i>Tier 1 form (10-K, 10-Q, 8-K, DEF 14A, Form 4, S-1, S-4)</li></ul>' +
-      '<h2>Shared links</h2><ul>' + Object.keys(ENTITY_TYPES).map(function (k) {
-        return '<li class="shared-k"><i style="background:' + ENTITY_TYPES[k].color + '"></i>' + esc(ENTITY_TYPES[k].label) + '</li>';
-      }).join('') + '</ul><p>Relationships are illustrative demo data.</p>';
-    if (window.innerWidth < 700) toggleLegend(false);
+    lg.innerHTML = '<div class="cx-head"><h2>Coverage explorer</h2><span class="cx-sum mono" id="cx-sum"></span></div>' +
+      '<div class="cx-tiers" role="group" aria-label="Filter by tier">' +
+      [['all', 'All'], ['1', 'Tier 1'], ['2', 'Tier 2'], ['3', 'Tier 3'], ['std', 'Other']].map(function (x) {
+        return '<button type="button" data-tier="' + x[0] + '" aria-pressed="' + (tierFilter === x[0]) + '">' + x[1] + '</button>';
+      }).join('') + '</div>' +
+      '<ul class="cx-cats">' + CAT_ORDER.map(function (c) {
+        var C = CATEGORIES[c], forms = F.CATALOG.filter(function (f) { return f.cat === c; });
+        return '<li><div class="cx-row"><label><input type="checkbox" data-cat="' + c + '" checked><i style="background:' + C.color + ';box-shadow:0 0 8px ' + C.color + '"></i>' + esc(C.label) + '</label>' +
+          '<span class="cx-n mono" data-catn="' + c + '">0</span>' +
+          '<button type="button" class="cx-exp" aria-expanded="false" aria-controls="cx-f-' + c + '" aria-label="Show ' + esc(C.label) + ' forms"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button></div>' +
+          '<ul class="cx-forms" id="cx-f-' + c + '" hidden>' + forms.map(function (f) {
+            return '<li><button type="button" data-form="' + esc(f.code) + '" aria-pressed="false"><span class="code mono' + (f.tier ? ' t' + f.tier : '') + '">' + esc(f.code) + '</span><span class="nm">' + esc(f.name) + '</span><span class="cx-n mono" data-formn="' + esc(f.code) + '">0</span></button></li>';
+          }).join('') + '</ul></li>';
+      }).join('') + '</ul>' +
+      '<div class="cx-detail" id="cx-detail" aria-live="polite"></div>' +
+      '<h2>Node key</h2><ul class="cx-key"><li><i class="k-t1"></i>Tier 1 &middot; essential</li><li><i class="k-t2"></i>Tier 2 &middot; advanced</li><li><i class="k-t3"></i>Tier 3 / other</li>' +
+      Object.keys(ENTITY_TYPES).map(function (k) { return '<li class="shared-k"><i style="background:' + ENTITY_TYPES[k].color + '"></i>' + esc(ENTITY_TYPES[k].label) + '</li>'; }).join('') +
+      '</ul><p>Relationships and filings are illustrative demo data.</p>';
+    if (window.innerWidth < 900) toggleLegend(false);
+    updateExplorer();
+  }
+  var exRaf = 0;
+  function updateExplorer() {
+    if (exRaf) return;
+    exRaf = requestAnimationFrame(function () {
+      exRaf = 0;
+      var c = watchCounts(), present = Object.keys(c.byForm).filter(function (k) { return F.BY_CODE[k]; }).length;
+      var sum = $('cx-sum'); if (!sum) return;
+      sum.textContent = present + ' / ' + F.CATALOG.length + ' forms';
+      document.querySelectorAll('[data-catn]').forEach(function (el) { el.textContent = c.byCat[el.getAttribute('data-catn')] || 0; });
+      document.querySelectorAll('[data-formn]').forEach(function (el) { var n = c.byForm[el.getAttribute('data-formn')] || 0; el.textContent = n; el.parentNode.classList.toggle('none', !n); });
+    });
+  }
+  function applyHighlight() {
+    if (!hasD3 || !gNodes) return;
+    gNodes.selectAll('g.node').classed('dim', function (d) { return !!hlForm && !(d.kind === 'filing' && d.filing.form === hlForm) && d.kind !== 'hub'; })
+      .classed('hl', function (d) { return !!hlForm && d.kind === 'filing' && d.filing.form === hlForm; });
+    gLinks.selectAll('line').classed('dim', !!hlForm);
+    gShared.selectAll('line').classed('dim', !!hlForm);
+  }
+  $('legend').addEventListener('change', function (e) {
+    var cb = e.target.closest('[data-cat]'); if (!cb) return;
+    if (cb.checked) delete hiddenCats[cb.getAttribute('data-cat')]; else hiddenCats[cb.getAttribute('data-cat')] = 1;
+    updateGraph();
+  });
+  $('legend').addEventListener('click', function (e) {
+    var tb = e.target.closest('[data-tier]');
+    if (tb) { tierFilter = tb.getAttribute('data-tier'); document.querySelectorAll('[data-tier]').forEach(function (b) { b.setAttribute('aria-pressed', String(b === tb)); }); updateGraph(); return; }
+    var ex = e.target.closest('.cx-exp');
+    if (ex) { var open = ex.getAttribute('aria-expanded') !== 'true'; ex.setAttribute('aria-expanded', String(open)); $(ex.getAttribute('aria-controls')).hidden = !open; return; }
+    var fb = e.target.closest('[data-form]');
+    if (fb) {
+      var code = fb.getAttribute('data-form');
+      hlForm = hlForm === code ? null : code;
+      document.querySelectorAll('[data-form]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-form') === hlForm)); });
+      var det = $('cx-detail');
+      if (!hlForm) { det.innerHTML = ''; applyHighlight(); return; }
+      var fi = formInfo(code), n = watchCounts().byForm[code] || 0;
+      det.innerHTML = '<b class="mono">' + esc(fi.code) + '</b> ' + esc(fi.name) + (fi.tier ? ' <span class="tb t' + fi.tier + '">Tier ' + fi.tier + '</span>' : '') + '<p>' + esc(fi.desc) + '</p>' +
+        '<p class="mono">' + n + ' in your hive' + (fi.cats.length > 1 ? ' \u00b7 also ' + fi.cats.slice(1).map(function (c) { return CATEGORIES[c].short; }).join(', ') : '') + '</p>' +
+        (n ? '<button type="button" class="btn btn-ghost btn-sm" data-open-form="' + esc(code) + '">Analyze first one</button>' : '<p class="muted">Add a company that files this form, e.g. ' + esc(suggestFor(code)) + '.</p>');
+      applyHighlight();
+      return;
+    }
+    var of = e.target.closest('[data-open-form]');
+    if (of) {
+      var code2 = of.getAttribute('data-open-form');
+      for (var i = 0; i < pinned.length; i++) {
+        var hit = getFilings(pinned[i]).slice(0, reveal[pinned[i]] || 0).filter(function (f) { return f.form === code2; })[0];
+        if (hit) { if (activeStock !== pinned[i]) selectStock(pinned[i]); openPanel(hit, pinned[i]); return; }
+      }
+    }
+  });
+  function suggestFor(code) {
+    var ks = Object.keys(TICKER_DB);
+    for (var i = 0; i < ks.length; i++) if (getFilings(ks[i]).some(function (f) { return f.form === code; })) return ks[i];
+    return 'XHLD';
   }
   function toggleLegend(show) {
     var lg = $('legend'), b = $('legend-btn');
@@ -663,10 +817,11 @@
   $('legend-btn').addEventListener('click', function () { toggleLegend(); });
   $('fit-btn').addEventListener('click', fit);
   $('load-demo').addEventListener('click', loadDemo);
+  // Nine companies that together file every form in the catalog
+  var DEMO_HIVE = ['NVDA', 'AAPL', 'MSFT', 'JPM', 'GS', 'TSM', 'ASML', 'XQRN', 'XHLD'];
   function loadDemo() {
-    var demo = ['NVDA', 'MSFT', 'AMZN', 'GOOGL', 'META'];
-    demo.forEach(function (t, i) {
-      setTimeout(function () { addStock(t, { instant: reduceMotion }); }, reduceMotion ? 0 : i * 1500);
+    DEMO_HIVE.forEach(function (t, i) {
+      setTimeout(function () { addStock(t, { instant: reduceMotion }); }, reduceMotion ? 0 : i * 1300);
     });
   }
 
@@ -681,7 +836,7 @@
     lastFocus = document.activeElement;
     $('panel-kicker').textContent = t + ' \u00b7 ' + CATEGORIES[f.cat].label.toUpperCase();
     $('panel-title').textContent = f.id;
-    $('panel-sub').textContent = f.form + ' \u00b7 Filed ' + f.date + (TIER1[f.form] ? ' \u00b7 Tier 1' : '');
+    $('panel-sub').textContent = f.form + ' \u00b7 ' + formInfo(f.form).name + ' \u00b7 Filed ' + f.date + (tierOf(f.form) ? ' \u00b7 Tier ' + tierOf(f.form) : '');
     panel.classList.add('open');
     panel.setAttribute('aria-hidden', 'false');
     $('ws-context').textContent = 'Workspace \u00b7 ' + t + ' \u00b7 ' + f.id;
@@ -723,61 +878,72 @@
     });
   });
 
+  function sha(seed) { var r = rng(hash(seed)), s = ''; for (var i = 0; i < 64; i++) s += '0123456789abcdef'[Math.floor(r() * 16)]; return s; }
+  function accFor(f, t) { var r = rng(hash(t + f.id + 'acc')); return cikOf(t).slice(-7).replace(/^0+/, '') .padStart(7, '0') + '-' + f.date.slice(-2) + '-' + String(100000 + Math.floor(r() * 899999)); }
   function crawlStages(f, t) {
-    var info = TICKER_DB[t], r = rng(hash(t + f.id)), xml = f.cat === 'insider';
-    var acc = info.cik.slice(-7) + '-24-' + String(100000 + Math.floor(r() * 899999));
-    var kb = Math.round(300 + r() * 700);
-    var diffs = diffsFor(f, t);
+    var info = TICKER_DB[t], r = rng(hash(t + f.id)), fi = formInfo(f.form), cik = cikOf(t);
+    var xml = f.cat === 'insider' && /^Form [345]$/.test(f.form), other = f.cat === 'other';
+    var acc = accFor(f, t), kb = Math.round(300 + r() * 700), diffs = diffsFor(f, t);
+    var amended = r() < 0.15;
     return [
-      { key: 'discover', label: 'Discover', lines: [
-        ['l-info', '> Resolving CIK via submissions API\u2026'],
-        ['l-ok', '> CIK ' + info.cik + ' \u00b7 ' + info.name],
-        ['l-ok', '> New accession ' + acc + ' (' + f.form + ')']] },
-      { key: 'retrieve', label: 'Retrieve', lines: [
-        ['l-info', '> GET primary document: ' + kb + ' KB ' + (xml ? 'XML' : 'HTML')],
-        ['l-info', '> GET ' + (xml ? 1 : 6 + Math.floor(r() * 10)) + ' exhibits \u00b7 rate limit 10 req/s respected']] },
-      { key: 'parse', label: 'Parse', chips: xml ? ['XML'] : ['HTML', 'iXBRL', 'PDF'], lines: xml ? [
-        ['l-ok', '> XML: ownership document \u00b7 ' + (1 + Math.floor(r() * 4)) + ' transactions']] : [
-        ['l-ok', '> HTML: ' + (8 + Math.floor(r() * 12)) + ' sections segmented (Items 1, 1A, 7, 8\u2026)'],
-        ['l-ok', '> iXBRL: ' + (600 + Math.floor(r() * 1400)) + ' tagged facts (us-gaap, dei)'],
-        ['l-mut', '  PDF: ' + Math.floor(r() * 3) + ' exhibits with text layer']] },
-      { key: 'agents', label: 'AI agents', chips: ['Financial', 'Risk', 'Historical diff', 'Forensic'], lines: [
-        ['l-info', '> Financial agent: key metrics reconciled to XBRL facts'],
-        ['l-info', '> Risk agent: ' + diffs.filter(function (d) { return d.type === 'added'; }).length + ' new disclosures flagged'],
-        ['l-info', '> Historical diff agent: ' + diffs.length + ' material passages vs prior filing'],
-        [f.burial > 0.45 ? 'l-warn' : 'l-mut', '> Forensic agent: burial score ' + Math.round(f.burial * 100) + (f.burial > 0.45 ? ' \u00b7 key detail sits in footnotes' : ' \u00b7 no anomalies')]] },
-      { key: 'report', label: 'Cited report', lines: [
+      { key: 'discover', label: 'Discover', chips: ['EDGAR full-index', 'Submissions API', 'Bulk archive', 'CIK map', 'Amendments'], lines: [
+        ['l-info', '> Poll daily index + submissions API for CIK ' + cik + (info.cik ? '' : ' (demo)')],
+        ['l-ok', '> Resolved ' + t + ' \u2192 ' + info.name + ' (ticker + historical names mapped)'],
+        ['l-ok', '> New accession ' + acc + ' \u00b7 ' + f.form + ' \u00b7 ' + fi.name],
+        [amended ? 'l-warn' : 'l-mut', amended ? '> Amendment detected: superseding prior version' : '  no prior amendment on record']] },
+      { key: 'retrieve', label: 'Retrieve', chips: ['Primary doc', 'Exhibits', 'XBRL', 'Dedupe', 'Retry', '\u226410 req/s'], lines: [
+        ['l-info', '> GET primary document \u00b7 ' + kb + ' KB ' + (xml ? 'XML' : other ? 'PDF' : 'HTML')],
+        ['l-info', '> GET ' + (xml ? 1 : 4 + Math.floor(r() * 12)) + ' exhibits + attachments' + (xml || other ? '' : ' + XBRL instance')],
+        ['l-mut', '  scheduler: fair-access 10 req/s \u00b7 User-Agent declared'],
+        [r() < 0.3 ? 'l-warn' : 'l-mut', r() < 0.3 ? '> HTTP 429 \u2192 exponential backoff 2s \u2192 retried OK' : '  dedupe: sha256 unseen \u00b7 stored']] },
+      { key: 'extract', label: 'Extract', chips: xml ? ['XML ownership'] : other ? ['PDF', 'Transcript text', 'Tables'] : ['HTML', 'iXBRL', 'PDF', 'XLSX', 'Exhibits'], lines: xml ? [
+        ['l-ok', '> XML: ownership document \u00b7 ' + (1 + Math.floor(r() * 4)) + ' transactions \u00b7 codes S, M, A'],
+        ['l-mut', '  footnotes linked to Table I rows']] : [
+        ['l-ok', '> ' + (other ? 'PDF/text' : 'HTML') + ': ' + (8 + Math.floor(r() * 12)) + ' sections segmented'],
+        ['l-ok', other ? '> Speaker turns + Q&A separated' : '> iXBRL: ' + (600 + Math.floor(r() * 1400)) + ' tagged facts (us-gaap, dei)'],
+        ['l-ok', '> ' + (3 + Math.floor(r() * 9)) + ' financial tables reconstructed \u00b7 concepts normalized'],
+        ['l-mut', '  footnotes, risk factors, MD&A and material agreements indexed']] },
+      { key: 'analyze', label: 'Analyze', chips: F.AGENTS.map(function (a) { return a.name; }), lines: [
+        ['l-info', '> Financial: key metrics reconciled to XBRL facts'],
+        ['l-info', '> Risk: ' + diffs.filter(function (d) { return d.type === 'added'; }).length + ' new disclosures flagged'],
+        ['l-info', '> Historical diff: ' + diffs.length + ' material passages vs prior version'],
+        [f.burial > 0.45 ? 'l-warn' : 'l-mut', '> Forensic: burial ' + Math.round(f.burial * 100) + (f.burial > 0.45 ? ' \u00b7 key detail sits in footnotes' : ' \u00b7 no anomalies')],
+        ['l-info', '> Corporate intel: ' + (2 + Math.floor(r() * 5)) + ' linked executives, holders or deals'],
+        ['l-info', '> External research: cross-checked ' + (1 + Math.floor(r() * 4)) + ' outside sources']] },
+      { key: 'report', label: 'Cited report', chips: ['Summary', 'Changes', 'Risks', 'Capital structure', 'Citations'], lines: [
         ['l-warn', '> Materiality ' + Math.round(f.materiality * 100) + '/100 \u00b7 ' + (f.materiality >= 0.7 ? 'HIGH' : f.materiality >= 0.5 ? 'MEDIUM' : 'LOW')],
-        ['l-ok', '> \u2713 Cited report ready']] }
+        ['l-ok', '> \u2713 Report ready \u00b7 every finding cites filing, period and page']] }
     ];
   }
 
   function renderCrawler(f, t) {
     var token = panelToken;
-    var stages = crawlStages(f, t);
-    var diffs = diffsFor(f, t);
-    var secs = (1.4 + (hash(f.id + t) % 30) / 10).toFixed(1);
+    var stages = crawlStages(f, t), diffs = diffsFor(f, t), fi = formInfo(f.form), info = TICKER_DB[t];
+    var secs = (1.4 + (hash(f.id + t) % 30) / 10).toFixed(1), acc = accFor(f, t), url = edgarUrl(t, f.form);
+    var src = info.cik ? 'https://www.sec.gov/Archives/edgar/data/' + String(+info.cik) + '/' + acc.replace(/-/g, '') + '/' : 'demo://' + t.toLowerCase() + '/' + acc;
     panelBody.innerHTML =
+      '<p class="form-desc"><b>' + esc(fi.name) + '.</b> ' + esc(fi.desc) + '</p>' +
       '<ol class="stages">' + stages.map(function (s, i) {
         return '<li class="stage" data-i="' + i + '"><div class="stage-h"><span>' + esc(s.label) + '</span><span class="st">queued</span></div>' +
-          (s.chips ? '<div class="chips">' + s.chips.map(function (c) { return '<span class="chip">' + esc(c) + '</span>'; }).join('') + '</div>' : '') + '</li>';
+          '<div class="chips">' + s.chips.map(function (c) { return '<span class="chip">' + esc(c) + '</span>'; }).join('') + '</div></li>';
       }).join('') + '</ol>' +
       '<div class="log" id="crawl-log" role="log" aria-label="Crawler log"></div>' +
       '<div class="report-card" id="report-card"><h3>Cited summary</h3><p>' + esc(diffs[0].text) + '</p>' +
       '<div class="cites">' + diffs.slice(0, 3).map(function (d, i) { return '<button type="button" class="cite" data-goto="diff">[' + (i + 1) + '] ' + esc(d.section) + '</button>'; }).join('') + '</div>' +
       '<div class="stats"><div class="stat"><b class="' + matClass(f.materiality) + '">' + Math.round(f.materiality * 100) + '</b><span>Materiality</span></div>' +
       '<div class="stat"><b class="c-amber">' + diffs.length + '</b><span>Changes</span></div>' +
-      '<div class="stat"><b class="c-accent">' + secs + 's</b><span>Crawl time</span></div></div></div>' +
-      '<p class="panel-foot"><a href="' + edgarUrl(t, f.form) + '" target="_blank" rel="noopener">View ' + esc(t) + ' ' + esc(f.form) + ' filings on SEC EDGAR</a> \u00b7 demo analysis is illustrative.</p>';
-    var log = $('crawl-log'), items = panelBody.querySelectorAll('.stage');
-    var seq = [];
+      '<div class="stat"><b class="c-accent">' + secs + 's</b><span>Crawl time</span></div></div>' +
+      '<dl class="prov"><dt>Source</dt><dd class="mono">' + esc(src) + '</dd><dt>SHA-256</dt><dd class="mono">' + sha(t + f.id).slice(0, 32) + '\u2026</dd>' +
+      '<dt>Period</dt><dd>' + esc(f.date) + '</dd><dt>Version</dt><dd>v1 \u00b7 original preserved</dd></dl></div>' +
+      '<p class="panel-foot">' + (url ? '<a href="' + url + '" target="_blank" rel="noopener">View ' + esc(t) + ' ' + esc(f.form) + ' filings on SEC EDGAR</a> \u00b7 ' : 'Fictional demo company: no EDGAR record. ') + 'Demo analysis is illustrative.</p>';
+    var log = $('crawl-log'), items = panelBody.querySelectorAll('.stage'), seq = [];
     stages.forEach(function (s, i) {
       seq.push({ stage: i, start: true });
-      s.lines.forEach(function (ln, k) { seq.push({ stage: i, line: ln, chip: s.chips ? k : -1 }); });
-      if (s.chips && s.chips.length > s.lines.length) for (var c = s.lines.length; c < s.chips.length; c++) seq.push({ stage: i, chip: c });
+      var n = Math.max(s.lines.length, s.chips.length);
+      for (var k = 0; k < n; k++) seq.push({ stage: i, line: s.lines[k], chip: k < s.chips.length ? k : -1 });
       seq.push({ stage: i, end: true });
     });
-    var i = 0, delay = reduceMotion ? 0 : 230;
+    var i = 0, delay = reduceMotion ? 0 : 140;
     function step() {
       if (token !== panelToken) return;
       if (i >= seq.length) { $('report-card').classList.add('visible'); return; }
@@ -785,7 +951,7 @@
       if (s.start) { el.classList.add('on'); el.querySelector('.st').textContent = 'running'; }
       if (s.line) { var d = document.createElement('div'); d.className = s.line[0]; d.textContent = s.line[1]; log.appendChild(d); log.scrollTop = log.scrollHeight; }
       if (s.chip >= 0) { var ch = el.querySelectorAll('.chip')[s.chip]; if (ch) ch.classList.add('on'); }
-      if (s.end) { el.classList.remove('on'); el.classList.add('done'); el.querySelector('.st').textContent = 'done'; el.querySelectorAll('.chip').forEach(function (c) { c.classList.add('on'); }); }
+      if (s.end) { el.classList.remove('on'); el.classList.add('done'); el.querySelector('.st').textContent = 'done'; }
       if (delay) setTimeout(step, delay); else step();
     }
     step();
@@ -830,7 +996,7 @@
     var rank = mat >= 70 ? 'CRITICAL' : mat >= 50 ? 'HIGH' : mat >= 30 ? 'MEDIUM' : 'LOW';
     var col = { CRITICAL: '#ff8f8f', HIGH: '#f6c177', MEDIUM: '#a5adff', LOW: '#6ee7b7' }[rank];
     var C = 2 * Math.PI * 58;
-    var rows = [['Volume delta', Math.round(mat * 0.5)], ['Hedging shift', Math.round(mat * 0.3)], ['Specificity', Math.round(mat * 0.2)], ['Tier weight', TIER1[f.form] ? 100 : 55]];
+    var rows = [['Volume delta', Math.round(mat * 0.5)], ['Hedging shift', Math.round(mat * 0.3)], ['Specificity', Math.round(mat * 0.2)], ['Tier weight', [45, 100, 75, 55][tierOf(f.form)]]];
     panelBody.innerHTML = '<div class="ring-wrap"><svg width="140" height="140" viewBox="0 0 140 140" aria-hidden="true"><circle class="ring-bg" cx="70" cy="70" r="58" stroke-width="10"/>' +
       '<circle class="ring-fg" id="ring-fg" cx="70" cy="70" r="58" stroke-width="10" stroke="' + col + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + C.toFixed(1) + '"/></svg>' +
       '<div class="ring-c"><b style="color:' + col + '">' + mat + '</b><span>/ 100 materiality</span></div></div>' +
@@ -973,6 +1139,8 @@
     }
     if (/load demo|demo hive/.test(q)) { loadDemo(); aiMessage({ text: 'Loading a demo hive of five companies. Shared shareholders and deals will start linking the clusters as they appear.' }); return; }
     if (atts.length) { respondDoc(atts[0], msg); return; }
+    var fm = findForm(msg);
+    if (fm && mode === 'chat' && /what|explain|mean|is a|tell me|define|which|\?/.test(q)) { respondForm(fm); return; }
     if (!activeStock) {
       aiMessage({ text: 'Add a company first so I have filings to work with. Type "add NVDA", search the watchlist, or load the demo hive.', after: '<div class="actions"><button type="button" class="btn btn-ghost btn-sm" data-act="demo">Load demo hive</button><button type="button" class="btn btn-ghost btn-sm" data-act="add-NVDA">Add NVDA</button></div>' });
       return;
@@ -982,6 +1150,23 @@
     respondChat(q);
   }
 
+  function findForm(msg) {
+    var up = ' ' + msg.toUpperCase().replace(/[^A-Z0-9 \-\/]/g, ' ') + ' ', best = null;
+    F.CATALOG.forEach(function (f) {
+      var codes = [f.code.toUpperCase()];
+      if (/^FORM /.test(codes[0])) codes.push(codes[0].replace('FORM ', ''));
+      if (/^SC /.test(codes[0])) codes.push('SCHEDULE ' + codes[0].slice(3));
+      codes.forEach(function (c) { if (c.length > 1 && up.indexOf(' ' + c + ' ') >= 0 && (!best || c.length > best.len)) best = { f: f, len: c.length }; });
+    });
+    return best && best.f;
+  }
+  function respondForm(f) {
+    var holders = pinned.filter(function (t) { return getFilings(t).some(function (x) { return x.form === f.code; }); });
+    var text = f.code + ' (' + f.name + '): ' + f.desc + ' Category: ' + f.cats.map(function (c) { return CATEGORIES[c].label; }).join(', ') + '. ' +
+      (f.tier ? 'Priority: ' + TIERS[f.tier].label + ' (' + TIERS[f.tier].name + '). ' : '') +
+      (holders.length ? 'In your hive: ' + holders.join(', ') + '. Pick it in the coverage explorer to highlight every ' + f.code + ' node.' : 'None in your hive yet. ' + suggestFor(f.code) + ' files one in the demo; type "add ' + suggestFor(f.code) + '".');
+    aiMessage({ kicker: 'Filing guide', text: text });
+  }
   function respondChat(q) {
     var t = activeStock, f = activeFiling ? activeFiling.filing : currentFiling(t), text;
     var insiders = getFilings(t).filter(function (x) { return x.form === 'Form 4' || x.form === 'Form 144'; }).length;
@@ -1006,7 +1191,7 @@
 
   function respondResearch(msg) {
     var t = activeStock, top = topFilings(t, 3);
-    var plan = ['Pull ' + getFilings(t).length + ' ' + t + ' filings across 7 categories', 'Compare each against the prior period', 'Cross-check insider (Form 4) and proxy (DEF 14A) activity', 'Synthesize findings with citations'];
+    var plan = ['Pull ' + getFilings(t).length + ' ' + t + ' filings across ' + Object.keys(getFilings(t).reduce(function (a, f) { a[f.cat] = 1; return a; }, {})).length + ' categories', 'Compare each against the prior period', 'Cross-check insider (Form 4) and proxy (DEF 14A) activity', 'Synthesize findings with citations'];
     var b = addMsg('ai', '<span class="kicker">Research mode \u00b7 ' + esc(t) + '</span><ol class="plan">' + plan.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + '</ol>');
     var lis = b.querySelectorAll('li'), i = 0, stopped = false;
     setBusy({ stop: function () { stopped = true; lis.forEach(function (l) { l.classList.add('done'); }); setBusy(null); } });

@@ -33,8 +33,10 @@ sitemap.xml robots.txt site.webmanifest .nojekyll
 assets/css/site.css   tokens, nav, buttons, glass, modal/form, consent banner, footer, legal pages
 assets/css/landing.css / app.css
 assets/js/site.js     consent (Consent Mode v2, default denied) + GA4 loader + Web3Forms waitlist modal
-assets/js/landing.js  scrollytelling loop (transform/opacity only, rAF, reduced-motion fallback)
-assets/js/app.js      mock data + hive graph + panel + workspace
+assets/js/landing.js  space hero: galaxy canvas (CSS-spun), 2 starfields, draggable dot-matrix Earth (Natural Earth land mask, base64)
+                      with filing arcs to the SEC + hive morph; ORACLE crawler tabs + simulated console; coverage explorer
+assets/js/filings.js  FULL filing catalog (51 forms + other investor docs, 8 categories, Tier 1/2/3) shared by both pages
+assets/js/app.js      mock data + hive graph + coverage explorer + crawler console + panel + workspace
 assets/img/           favicon.svg, favicon-32.png, apple-touch-icon.png, icon-192/512.png, og-image.jpg (1200x630), og-image.svg (source)
 frontend/edgar_v2.html  redirect stub -> app.html (old single-file app is in git history before the redesign commit)
 frontend/index.html, frontend/notifications.js  legacy, not linked from the site
@@ -76,8 +78,9 @@ python3 -m http.server 8766 --bind 127.0.0.1   # from repo root, open http://127
 ---
 
 ## Design system
-- Dark OLED base `--bg:#05060c`; text `#eef1f8` / `#c0c7d8`; muted `#949db2` (>= 5.9:1 on all surfaces)
-- Accents: periwinkle `#a5adff`, teal `#5eead4`, gold `#e3c08a`, rose `#ff9aae`; CTA ivory `#eef0ff` on `#0a0c18`
+- Deep-space base `--bg:#02030a` with a fixed nebula + SVG star tile (`body::before`); text `#eef2ff` / `#c3c9e6`; muted `#98a2c4`
+- Accents: nebula periwinkle `#a8b4ff`, violet `#b794ff`, cosmic cyan `#67e8f9`, starlight gold `#f5c97a`, plasma `#f9a8d4`; CTA `#eef1ff` on `#070a1c`
+- Gotcha: `background-size` needs one value per background layer (the nebula is 3 gradients + 1 star tile), or layers tile
 - Fonts (Google Fonts): Instrument Serif (display), IBM Plex Sans (UI), IBM Plex Mono (data)
 - Motion: slow ease-in-out `cubic-bezier(.65,0,.35,1)`; animate transform/opacity only; honor prefers-reduced-motion
 - Exactly one CTA on the landing page: "Get early access" (`data-waitlist` opens the modal)
@@ -87,9 +90,9 @@ python3 -m http.server 8766 --bind 127.0.0.1   # from repo root, open http://127
 |-----|---------|
 | `TICKER_DB` | 20 tickers: name, price, change, sector, cik, exchange |
 | `FILING_DATA` | Per-ticker base filings (NVDA rich, others use DEFAULT). Schema `{id, form, date, current, materiality, burial, gap, group}` |
-| `getFilings(t)` | Base filings + seeded extras across 7 categories (DEF 14A, Form 4, 13G, S-8, 424B2/FWP, SD...) |
-| `DIFFS` | Before/after passages `{type, section, text, before, after}`; `CATEGORY_DIFFS` for non-financial forms |
-| `CATEGORIES`, `TIER1` | Filing taxonomy + Tier 1 forms (10-K, 10-Q, 8-K, DEF 14A, Form 4, S-1, S-4) |
+| `getFilings(t)` | Base filings + seeded filings across all 8 categories; `FORCE` + fictional `XQRN`/`XHLD` + foreign `TSM`/`ASML` guarantee all 51 forms appear in the demo hive |
+| `DIFFS` | Before/after passages `{type, section, text, before, after}`; `FORM_DIFFS` / `CATEGORY_DIFFS` for other forms |
+| `EDM_FILINGS` (filings.js) | `CATEGORIES`, `CATALOG` (code, name, desc, cats, tier), `TIERS`, `FEATURES`, `AGENTS` |
 | `SHARED_ENTITIES` | Illustrative shared holders / executives / deals linking clusters |
 | `AI_RESPONSES` | Deterministic mock chat responses |
 

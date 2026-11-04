@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 <title>EDGAR Disclosure Monitor &mdash; AI intelligence for every SEC filing</title>
-<meta name="description" content="EDGAR Disclosure Monitor crawls SEC EDGAR, parses HTML, iXBRL and PDF filings, and uses AI agents to surface what changed, with cited reports. Join the early-access waitlist.">
+<meta name="description" content="EDGAR Disclosure Monitor crawls SEC EDGAR across 50+ form types, parses HTML, iXBRL and PDF filings, and uses six AI agents to surface what changed, with cited reports. Join the early-access waitlist.">
 <link rel="canonical" href="https://krish-1717.github.io/edgar-disclosure-monitor/">
-<meta name="theme-color" content="#05060c">
+<meta name="theme-color" content="#02030a">
 <meta name="color-scheme" content="dark">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="EDGAR Disclosure Monitor">
@@ -46,8 +46,9 @@
   </a>
   <nav aria-label="Primary">
     <ul>
-      <li><a class="nav-link" href="#pipeline">Crawler</a></li>
+      <li><a class="nav-link" href="#crawler">Crawler</a></li>
       <li><a class="nav-link" href="#coverage">Coverage</a></li>
+      <li><a class="nav-link" href="#intelligence">Intelligence</a></li>
       <li><a class="nav-link" href="#oracle">Vision</a></li>
       <li><a class="nav-link" href="app.html">Live demo</a></li>
     </ul>
@@ -56,19 +57,23 @@
 </header>
 
 <main id="main">
-  <!-- ============ PINNED SCROLLYTELLING HERO ============ -->
+  <!-- ============ PINNED SCROLLYTELLING HERO: galaxy + interactive Earth ============ -->
   <section class="story" id="story" aria-label="Introduction">
     <div class="story-stage">
-      <div class="layer layer-bg" data-depth="0.15" aria-hidden="true">
+      <div class="layer layer-bg" aria-hidden="true">
         <div class="glow glow-a"></div>
         <div class="glow glow-b"></div>
         <div class="glow glow-c"></div>
+        <div class="galaxy-tilt"><div class="galaxy-spin"><canvas id="galaxy" width="1400" height="1400"></canvas></div></div>
       </div>
-      <canvas class="layer story-canvas" id="story-canvas" aria-hidden="true"></canvas>
+      <canvas class="layer stars stars-far" id="stars-far" aria-hidden="true"></canvas>
+      <canvas class="layer stars stars-near" id="stars-near" aria-hidden="true"></canvas>
+      <canvas class="layer story-canvas" id="story-canvas" tabindex="0" role="img"
+        aria-label="Interactive globe showing companies filing with the SEC. Drag, or use the arrow keys, to rotate it."></canvas>
       <div class="layer vignette" aria-hidden="true"></div>
 
       <!-- mid-ground UI fragments (parallax) -->
-      <div class="layer layer-mid" data-depth="0.5" aria-hidden="true">
+      <div class="layer layer-mid" aria-hidden="true">
         <div class="ui-frag frag-diff glass">
           <div class="frag-head"><span class="pill pill-rose">CHANGED</span><span class="mono">10-K &middot; Item 7 &middot; MD&amp;A</span></div>
           <p class="frag-old">&ldquo;We expect revenues to remain consistent with prior periods&hellip;&rdquo;</p>
@@ -81,17 +86,21 @@
         </div>
         <div class="ui-frag frag-agents glass">
           <div class="mono small">AGENTS</div>
-          <ul><li><b class="dot ok"></b>Financial</li><li><b class="dot warn"></b>Risk</li><li><b class="dot ok"></b>Historical diff</li><li><b class="dot rose"></b>Forensic</li></ul>
+          <ul><li><b class="dot ok"></b>Financial</li><li><b class="dot warn"></b>Risk</li><li><b class="dot ok"></b>Historical diff</li><li><b class="dot rose"></b>Forensic</li><li><b class="dot ok"></b>Corporate intel</li><li><b class="dot warn"></b>External research</li></ul>
+        </div>
+        <div class="ui-frag frag-feed glass">
+          <div class="mono small">LIVE CRAWL</div>
+          <ol class="mono" id="hero-feed"></ol>
         </div>
       </div>
 
       <!-- foreground type: four scenes cross-fade with scroll -->
-      <div class="layer layer-fg" data-depth="1">
+      <div class="layer layer-fg">
         <article class="scene scene-1 is-active" data-scene="0">
           <div class="scene-card glass">
             <span class="eyebrow">SEC disclosure intelligence</span>
             <h1 class="display">Every filing.<br><em>Every footnote.</em><br>Every change.</h1>
-            <p class="lede">EDGAR Disclosure Monitor reads 10-Ks, proxies, insider forms and offerings the moment they land, and tells you exactly what moved.</p>
+            <p class="lede">EDGAR Disclosure Monitor watches every public company on Earth that files with the SEC, reads each document the moment it lands, and tells you exactly what moved.</p>
             <div class="cta-row">
               <a class="btn btn-cta" href="#waitlist" data-waitlist>Get early access</a>
               <a class="text-link" href="app.html">Explore the live demo</a>
@@ -102,14 +111,14 @@
           <div class="scene-card glass">
             <span class="eyebrow">01 &middot; Discover</span>
             <h2 class="display">Crawled the moment it hits EDGAR.</h2>
-            <p class="lede">Thousands of documents a day. HTML, inline XBRL and PDF exhibits, pulled straight from the source.</p>
+            <p class="lede">50+ form types from issuers worldwide. HTML, inline XBRL, PDFs and exhibits, pulled straight from the source with fair-access rate limits.</p>
           </div>
         </article>
         <article class="scene scene-3" data-scene="2">
           <div class="scene-card glass">
             <span class="eyebrow">02 &middot; Understand</span>
-            <h2 class="display">Read by AI agents that <em>never skim.</em></h2>
-            <p class="lede">Financial, risk, historical-diff and forensic agents compare every sentence against the prior filing.</p>
+            <h2 class="display">Read by six AI agents that <em>never skim.</em></h2>
+            <p class="lede">Financial, risk, historical-diff, forensic, corporate-intelligence and external-research agents compare every sentence with the last filing.</p>
           </div>
         </article>
         <article class="scene scene-4" data-scene="3">
@@ -121,69 +130,83 @@
         </article>
       </div>
 
+      <div class="drag-hint mono" aria-hidden="true"><span class="drag-ico"></span>Drag to spin the Earth</div>
       <div class="story-progress" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <div class="scroll-hint" aria-hidden="true"><span>Scroll</span><b></b></div>
     </div>
   </section>
 
-  <!-- ============ CRAWLER PIPELINE ============ -->
-  <section class="section" id="pipeline" aria-labelledby="pipeline-title">
+  <!-- ============ ORACLE CRAWLER ============ -->
+  <section class="section" id="crawler" aria-labelledby="crawler-title">
     <div class="wrap">
       <header class="section-head reveal">
-        <span class="eyebrow">The crawler</span>
-        <h2 id="pipeline-title" class="display-md">From raw filing to <em>cited answer</em> in five steps.</h2>
-        <p class="lede">Every claim traces back to a page, section and sentence of the original document.</p>
+        <span class="eyebrow">The crawler &middot; ORACLE engine</span>
+        <h2 id="crawler-title" class="display-md">An autonomous crawler that <em>reads like an analyst.</em></h2>
+        <p class="lede">It continuously discovers, retrieves, indexes and analyzes corporate filings, and every finding traces back to a page, section and sentence of the original document.</p>
       </header>
-      <ol class="pipeline">
-        <li class="step reveal">
-          <span class="step-num mono">01</span>
-          <h3>Discover</h3>
-          <p>Watches EDGAR feeds and the submissions API for new accession numbers across your watchlist.</p>
-        </li>
-        <li class="step reveal">
-          <span class="step-num mono">02</span>
-          <h3>Retrieve</h3>
-          <p>Fetches the primary document and every exhibit, respecting SEC fair-access rate limits.</p>
-        </li>
-        <li class="step reveal">
-          <span class="step-num mono">03</span>
-          <h3>Parse</h3>
-          <p>Segments sections and extracts tagged facts.</p>
-          <div class="chips"><span class="chip">HTML</span><span class="chip">iXBRL</span><span class="chip">PDF</span></div>
-        </li>
-        <li class="step reveal">
-          <span class="step-num mono">04</span>
-          <h3>AI agents</h3>
-          <p>Specialists work in parallel and cross-check each other.</p>
-          <div class="chips"><span class="chip">Financial</span><span class="chip">Risk</span><span class="chip">Historical diff</span><span class="chip">Forensic</span></div>
-        </li>
-        <li class="step reveal">
-          <span class="step-num mono">05</span>
-          <h3>Cited report</h3>
-          <p>A scored brief where every finding links to its source passage.</p>
-          <p class="cite mono">[10-K 2024 &middot; Item 1A &middot; p.31]</p>
-        </li>
-      </ol>
+
+      <div class="crawler-grid">
+        <ol class="subsystems" role="tablist" aria-label="Crawler subsystems" id="subsystems">
+          <li><button type="button" role="tab" aria-selected="true" aria-controls="subsystem-panel" id="ss-0" data-ss="0"><span class="mono">01</span>Data acquisition</button></li>
+          <li><button type="button" role="tab" aria-selected="false" aria-controls="subsystem-panel" id="ss-1" data-ss="1" tabindex="-1"><span class="mono">02</span>Extraction &amp; processing</button></li>
+          <li><button type="button" role="tab" aria-selected="false" aria-controls="subsystem-panel" id="ss-2" data-ss="2" tabindex="-1"><span class="mono">03</span>AI intelligence</button></li>
+          <li><button type="button" role="tab" aria-selected="false" aria-controls="subsystem-panel" id="ss-3" data-ss="3" tabindex="-1"><span class="mono">04</span>Cited reports</button></li>
+          <li><button type="button" role="tab" aria-selected="false" aria-controls="subsystem-panel" id="ss-4" data-ss="4" tabindex="-1"><span class="mono">05</span>Guarantees</button></li>
+        </ol>
+        <div class="subsystem-panel glass" id="subsystem-panel" role="tabpanel" aria-labelledby="ss-0" tabindex="0"></div>
+
+        <div class="console glass" aria-label="Simulated crawler console">
+          <div class="console-head">
+            <span class="dot ok"></span><span class="mono">oracle-crawler &middot; simulated</span>
+            <span class="console-rate mono" id="console-rate">0.0 req/s</span>
+          </div>
+          <div class="console-metrics" id="console-metrics">
+            <div><b id="m-disc">0</b><span>discovered</span></div>
+            <div><b id="m-ret">0</b><span>retrieved</span></div>
+            <div><b id="m-dup">0</b><span>duplicates skipped</span></div>
+            <div><b id="m-cite">0</b><span>citations</span></div>
+          </div>
+          <ol class="console-log mono" id="console-log" aria-live="off"></ol>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- ============ COVERAGE ============ -->
+  <!-- ============ COVERAGE (full catalog) ============ -->
   <section class="section" id="coverage" aria-labelledby="coverage-title">
     <div class="wrap">
       <header class="section-head reveal">
         <span class="eyebrow">Coverage</span>
         <h2 id="coverage-title" class="display-md">Not just the 10-K. <em>The whole paper trail.</em></h2>
-        <p class="lede">Seven families of forms, with the seven that move markets most given extra weight.</p>
+        <p class="lede">Every filing family investors rely on, plus the investor documents that never reach EDGAR as standalone forms.</p>
       </header>
-      <div class="coverage-grid">
-        <div class="cov reveal" style="--c:#a5adff"><h3>Financial reporting</h3><p class="forms"><b>10-K</b><b>10-Q</b><b>8-K</b><span>20-F</span><span>6-K</span><span>11-K</span></p></div>
-        <div class="cov reveal" style="--c:#5eead4"><h3>Governance &amp; proxy</h3><p class="forms"><b>DEF&nbsp;14A</b><span>PRE&nbsp;14A</span><span>DEFA14A</span><span>DEF&nbsp;14C</span><span>DEFM14A</span><span>DEFC14A</span></p></div>
-        <div class="cov reveal" style="--c:#e3c08a"><h3>Insider &amp; ownership</h3><p class="forms"><span>Form&nbsp;3</span><b>Form&nbsp;4</b><span>Form&nbsp;5</span><span>144</span><span>13D</span><span>13G</span><span>13F-HR</span></p></div>
-        <div class="cov reveal" style="--c:#c4a1ff"><h3>Offerings</h3><p class="forms"><b>S-1</b><span>S-3</span><b>S-4</b><span>S-8</span><span>424B3</span><span>424B5</span><span>F-1</span><span>F-3</span></p></div>
-        <div class="cov reveal" style="--c:#ff9aae"><h3>M&amp;A</h3><p class="forms"><span>SC&nbsp;TO-T</span><span>SC&nbsp;TO-I</span><span>SC&nbsp;14D9</span><span>425</span><span>PREM14A</span></p></div>
-        <div class="cov reveal" style="--c:#7dd3fc"><h3>Debt</h3><p class="forms"><span>424B2</span><span>FWP</span></p></div>
-        <div class="cov reveal" style="--c:#b6c0d4"><h3>Specialized</h3><p class="forms"><span>SD</span><span>13F-NT</span><span>10-D</span><span>ABS-EE</span><span>NT&nbsp;10-K</span><span>NT&nbsp;10-Q</span><span>15-12B/G</span></p></div>
-        <div class="cov cov-key reveal"><h3>Tier 1</h3><p>Emphasized forms are highlighted like <b>this</b> in the network and weighted higher in scoring.</p></div>
+      <div class="tiers reveal" id="tiers"></div>
+      <div class="cov-tabs reveal" role="tablist" aria-label="Filing categories" id="cov-tabs"></div>
+      <div class="cov-panel glass reveal" id="cov-panel" role="tabpanel" tabindex="0"></div>
+    </div>
+  </section>
+
+  <!-- ============ INTELLIGENCE ============ -->
+  <section class="section" id="intelligence" aria-labelledby="intel-title">
+    <div class="wrap">
+      <header class="section-head reveal">
+        <span class="eyebrow">Intelligence</span>
+        <h2 id="intel-title" class="display-md">Beyond a filing reader.</h2>
+      </header>
+      <ul class="features" id="features"></ul>
+      <div class="example glass reveal">
+        <div class="example-head">
+          <span class="eyebrow">Example</span>
+          <h3>Nike files a new 10-K. Within minutes:</h3>
+        </div>
+        <ol class="findings">
+          <li class="reveal"><span class="pill pill-ok">ADDED</span><p>A newly added risk factor.</p><span class="cite mono">Item 1A &middot; p.18</span></li>
+          <li class="reveal"><span class="pill pill-warn">CHANGED</span><p>A shift in management&rsquo;s outlook language.</p><span class="cite mono">Item 7 &middot; p.34</span></li>
+          <li class="reveal"><span class="pill pill-rose">DOWN</span><p>Deterioration in gross margins.</p><span class="cite mono">Item 8 &middot; Note 2</span></li>
+          <li class="reveal"><span class="pill pill-rose">UP</span><p>An increase in long-term debt.</p><span class="cite mono">Item 8 &middot; Note 9</span></li>
+          <li class="reveal"><span class="pill pill-warn">CHANGED</span><p>Changes to executive compensation.</p><span class="cite mono">DEF 14A &middot; CD&amp;A</span></li>
+        </ol>
+        <p class="example-foot">Then a report explains what changed, why it matters, and where each fact appears in the original filing. <span class="muted">Illustrative example.</span></p>
       </div>
     </div>
   </section>
@@ -194,16 +217,25 @@
       <div class="reveal">
         <span class="eyebrow">Where this is going</span>
         <h2 id="oracle-title" class="display-md"><em>ORACLE</em>: an institutional-grade SEC intelligence engine.</h2>
-        <p class="lede">Today's demo runs on illustrative data in your browser. The roadmap is a production crawler and AI engine that ingests the full EDGAR corpus, normalizes XBRL facts, and answers questions with citations.</p>
+        <p class="lede">Today&rsquo;s demo runs on illustrative data in your browser. The goal is an autonomous corporate intelligence engine that turns millions of regulatory documents into continuously updated, evidence-backed research.</p>
       </div>
-      <ul class="stack reveal" aria-label="Planned technology stack">
-        <li><span class="mono">Python</span> core services</li>
-        <li><span class="mono">Scrapy</span> distributed crawling</li>
-        <li><span class="mono">EdgarTools</span> filing access</li>
-        <li><span class="mono">Arelle</span> XBRL validation</li>
-        <li><span class="mono">FastAPI</span> query layer</li>
-        <li><span class="mono">PostgreSQL</span> filing store</li>
-      </ul>
+      <table class="stack-table reveal">
+        <caption class="sr-only">Planned technology stack</caption>
+        <thead><tr><th scope="col">Component</th><th scope="col">Technology</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Crawling</th><td>Python, Scrapy, HTTPX</td></tr>
+          <tr><th scope="row">SEC integration</th><td>EdgarTools, SEC APIs</td></tr>
+          <tr><th scope="row">XBRL processing</th><td>Arelle</td></tr>
+          <tr><th scope="row">Document parsing</th><td>Docling, BeautifulSoup</td></tr>
+          <tr><th scope="row">AI orchestration</th><td>Specialized LLM agents</td></tr>
+          <tr><th scope="row">Backend</th><td>Python, FastAPI</td></tr>
+          <tr><th scope="row">Database</th><td>PostgreSQL</td></tr>
+          <tr><th scope="row">Search</th><td>OpenSearch</td></tr>
+          <tr><th scope="row">Analytics</th><td>ClickHouse, Polars</td></tr>
+          <tr><th scope="row">Workflows</th><td>Temporal</td></tr>
+          <tr><th scope="row">Storage</th><td>S3-compatible object storage</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
@@ -234,6 +266,7 @@
 </footer>
 
 <script src="assets/js/site.js"></script>
+<script src="assets/js/filings.js" defer></script>
 <script src="assets/js/landing.js" defer></script>
 </body>
 </html>
