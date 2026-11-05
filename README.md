@@ -14,7 +14,7 @@ The static site lives at the repo root and is served by GitHub Pages from `main`
 | `app.html` | Demo app: watchlist, D3 "hive" network, analysis panel, AI workspace chat (illustrative data) |
 | `privacy.html`, `terms.html` | Legal templates (must be reviewed by a lawyer) |
 | `404.html` | Custom not-found page (self-contained) |
-| `assets/js/site.js` | Cookie consent, GA4 (consent-gated), Web3Forms waitlist. **Owner placeholders:** `GA_MEASUREMENT_ID`, `WEB3FORMS_ACCESS_KEY` |
+| `assets/js/site.js` | Cookie consent, GA4 (consent-gated), Web3Forms waitlist. **Owner placeholder:** `GA_MEASUREMENT_ID` (the Web3Forms key is set) |
 | `assets/js/app.js` | Demo app logic and mock data (`TICKER_DB`, `FILING_DATA`, `DIFFS`) |
 | `sitemap.xml`, `robots.txt`, `site.webmanifest`, `.nojekyll` | SEO / Pages config |
 

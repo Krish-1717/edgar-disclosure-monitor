@@ -44,7 +44,7 @@ frontend/index.html, frontend/notifications.js  legacy, not linked from the site
 
 ## Owner placeholders (in `assets/js/site.js`)
 - `GA_MEASUREMENT_ID = 'G-XXXXXXXXXX'` - GA4 only loads after the visitor clicks Accept.
-- `WEB3FORMS_ACCESS_KEY = 'YOUR_WEB3FORMS_ACCESS_KEY'` - until set, the form shows "not connected yet".
+- `WEB3FORMS_ACCESS_KEY` - set (form "EDGAR Monitor waitlist" in the owner's Web3Forms account, patelkrish1717@gmail.com); signups are emailed there.
 - Legal pages: `[CONTACT EMAIL]`, `[LEGAL NAME / ENTITY]`, `[DATE]`, jurisdiction, etc.
 Both keys are public identifiers, not secrets. Never put real secrets in the frontend.
 

@@ -5,7 +5,7 @@
  * OWNER TODO: paste real values below. Both are public identifiers, not secrets.
  */
 var GA_MEASUREMENT_ID = 'G-XXXXXXXXXX';          // Google Analytics 4 measurement ID
-var WEB3FORMS_ACCESS_KEY = 'YOUR_WEB3FORMS_ACCESS_KEY'; // from https://web3forms.com
+var WEB3FORMS_ACCESS_KEY = 'be3415c5-5a4d-4a87-b6ae-49bd8b23de67'; // from https://web3forms.com
 
 (function () {
   'use strict';
