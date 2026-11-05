@@ -49,7 +49,7 @@ _ITEM_RE = re.compile(
 )
 _PART_RE = re.compile(r"^\s*part[\s\u00a0]+(iv|iii|ii|i|[1-4])\b[^\n]{0,120}$", re.IGNORECASE | re.MULTILINE)
 _ROMAN = {"1": "I", "2": "II", "3": "III", "4": "IV"}
-MIN_SECTION_CHARS = 200
+MIN_SECTION_CHARS = 60    # short "no material changes" statements are still useful
 
 
 def html_to_text(html: bytes | str) -> str:
@@ -98,6 +98,28 @@ def _part_markers(text: str) -> list[tuple[int, str]]:
     return out
 
 
+# 10-Q item titles are standardised (Form 10-Q General Instructions), so the title tells
+# the part even when PART headings are missing or a second table of contents misleads.
+_TITLE_PART = [
+    (re.compile(r"financial statements", re.I), {"1": "I"}),
+    (re.compile(r"management.{0,3}s discussion|discussion and analysis", re.I), {"2": "I"}),
+    (re.compile(r"quantitative and qualitative|market risk", re.I), {"3": "I"}),
+    (re.compile(r"controls and procedures", re.I), {"4": "I"}),
+    (re.compile(r"legal proceedings", re.I), {"1": "II"}),
+    (re.compile(r"risk factors", re.I), {"1A": "II"}),
+    (re.compile(r"unregistered sales|equity securities|use of proceeds", re.I), {"2": "II"}),
+    (re.compile(r"defaults upon senior", re.I), {"3": "II"}),
+    (re.compile(r"mine safety", re.I), {"4": "II"}),
+]
+
+
+def _part_from_title(item: str, title: str) -> str | None:
+    for rx, mapping in _TITLE_PART:
+        if item in mapping and rx.search(title):
+            return mapping[item]
+    return None
+
+
 def _headings(text: str, parts: list[tuple[int, str]]) -> list[_Heading]:
     heads: list[_Heading] = []
     for m in _ITEM_RE.finditer(text):
@@ -108,6 +130,7 @@ def _headings(text: str, parts: list[tuple[int, str]]) -> list[_Heading]:
             else:
                 break
         item = m.group(1).upper()
+        part = _part_from_title(item, m.group(2) or "") or part
         # Running page headers ("PART II / Item 7" on every page) repeat the open item.
         if heads and (heads[-1].part, heads[-1].item) == (part, item):
             continue
@@ -154,7 +177,7 @@ def segment(text: str, form: str) -> list[dict]:
 
     item15 = best.pop("_item15", None)
     fs = best.get("financial_statements")
-    if item15 and (fs is None or fs[0] < 5 * MIN_SECTION_CHARS) and item15[0] > (fs[0] if fs else 0):
+    if item15 and (fs is None or fs[0] < 1000) and item15[0] > (fs[0] if fs else 0):
         best["financial_statements"] = (item15[0], "Item 15 (referenced from Item 8)",
                                         "Financial Statements and Supplementary Data", item15[3])
 

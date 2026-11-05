@@ -227,6 +227,26 @@ def test_running_page_headers_do_not_split_sections():
     assert "MARKET-BODY" in secs["market_risk"]["text"]
 
 
+def test_10q_without_part_headings_in_body():
+    # TOC has PART markers; the body has none (as in Netflix's 10-Qs).
+    html = fx.TEN_Q_HTML.replace("<div>PART I. FINANCIAL INFORMATION</div>\n<div>Item 1. Financial Statements</div>",
+                                 "<div>Item 1. Financial Statements</div>")
+    html = html.replace("{}<div>PART II. OTHER INFORMATION</div>\n<div>Item 1. Legal Proceedings</div>".format(""),
+                        "<div>Item 1. Legal Proceedings</div>")
+    assert html.count("PART II") == 1
+    secs = {s["key"]: s for s in extract.segment_html(html, "10-Q")}
+    assert secs["mdna"]["text"].startswith("QMDNA-BODY")
+    assert secs["risk_factors"]["text"].startswith("QRISK-BODY")
+    assert secs["risk_factors"]["item"] == "Part II, Item 1A"
+
+
+def test_short_no_change_statement_kept():
+    html = fx.TEN_Q_HTML.replace("QMKT-BODY No material changes. " + fx.LOREM,
+                                 "There have been no material changes to our market risk since the 10-K.")
+    secs = {s["key"]: s for s in extract.segment_html(html, "10-Q")}
+    assert secs["market_risk"]["text"].startswith("There have been no material changes")
+
+
 def test_non_periodic_forms_not_segmented():
     assert extract.segment_html(fx.EIGHT_K_HTML, "8-K") == []
 

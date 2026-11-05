@@ -1,0 +1,266 @@
+{
+ "schema": 1,
+ "generated_at": "2026-11-05T01:08:43+00:00",
+ "companies": [
+  {
+   "ticker": "AAPL",
+   "name": "Apple Inc.",
+   "cik": "0000320193",
+   "last_crawled_at": "2026-11-05T01:04:24+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "10-K",
+    "filing_date": "2026-11-03",
+    "accession": "0000320193-26-000026"
+   },
+   "feed": "companies/AAPL.json"
+  },
+  {
+   "ticker": "AMD",
+   "name": "ADVANCED MICRO DEVICES INC",
+   "cik": "0000002488",
+   "last_crawled_at": "2026-11-05T01:04:35+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "10-Q",
+    "filing_date": "2026-11-04",
+    "accession": "0000002488-26-000191"
+   },
+   "feed": "companies/AMD.json"
+  },
+  {
+   "ticker": "AMZN",
+   "name": "AMAZON COM INC",
+   "cik": "0001018724",
+   "last_crawled_at": "2026-11-05T01:04:28+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-11-04",
+    "accession": "0001936006-26-000028"
+   },
+   "feed": "companies/AMZN.json"
+  },
+  {
+   "ticker": "BAC",
+   "name": "BANK OF AMERICA CORP /DE/",
+   "cik": "0000070858",
+   "last_crawled_at": "2026-11-05T01:04:31+00:00",
+   "filings": 11,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-11-03",
+    "accession": "0000070858-26-000556"
+   },
+   "feed": "companies/BAC.json"
+  },
+  {
+   "ticker": "BRK-B",
+   "name": "BERKSHIRE HATHAWAY INC",
+   "cik": "0001067983",
+   "last_crawled_at": "2026-11-05T01:04:37+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-11-03",
+    "accession": "0001193125-26-445930"
+   },
+   "feed": "companies/BRK-B.json"
+  },
+  {
+   "ticker": "GOOGL",
+   "name": "Alphabet Inc.",
+   "cik": "0001652044",
+   "last_crawled_at": "2026-11-05T01:04:26+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-10-30",
+    "accession": "0001193125-26-442116"
+   },
+   "feed": "companies/GOOGL.json"
+  },
+  {
+   "ticker": "GS",
+   "name": "GOLDMAN SACHS GROUP INC",
+   "cik": "0000886982",
+   "last_crawled_at": "2026-11-05T01:04:32+00:00",
+   "filings": 11,
+   "latest": {
+    "form": "10-Q",
+    "filing_date": "2026-11-02",
+    "accession": "0000886982-26-000532"
+   },
+   "feed": "companies/GS.json"
+  },
+  {
+   "ticker": "JPM",
+   "name": "JPMORGAN CHASE & CO",
+   "cik": "0000019617",
+   "last_crawled_at": "2026-11-05T01:04:30+00:00",
+   "filings": 12,
+   "latest": {
+    "form": "10-Q",
+    "filing_date": "2026-11-03",
+    "accession": "0001628280-26-069523"
+   },
+   "feed": "companies/JPM.json"
+  },
+  {
+   "ticker": "LLY",
+   "name": "ELI LILLY & Co",
+   "cik": "0000059478",
+   "last_crawled_at": "2026-11-05T01:04:34+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-11-04",
+    "accession": "0001538604-26-000006"
+   },
+   "feed": "companies/LLY.json"
+  },
+  {
+   "ticker": "MA",
+   "name": "Mastercard Inc",
+   "cik": "0001141391",
+   "last_crawled_at": "2026-11-05T01:04:39+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-11-03",
+    "accession": "0001141391-26-000126"
+   },
+   "feed": "companies/MA.json"
+  },
+  {
+   "ticker": "META",
+   "name": "Meta Platforms, Inc.",
+   "cik": "0001326801",
+   "last_crawled_at": "2026-11-05T01:04:27+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-11-04",
+    "accession": "0000950103-26-016962"
+   },
+   "feed": "companies/META.json"
+  },
+  {
+   "ticker": "MSFT",
+   "name": "MICROSOFT CORP",
+   "cik": "0000789019",
+   "last_crawled_at": "2026-11-05T01:04:25+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "8-K",
+    "filing_date": "2026-11-04",
+    "accession": "0001193125-26-447173"
+   },
+   "feed": "companies/MSFT.json"
+  },
+  {
+   "ticker": "NFLX",
+   "name": "NETFLIX INC",
+   "cik": "0001065280",
+   "last_crawled_at": "2026-11-05T01:04:33+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-11-04",
+    "accession": "0001065280-26-000312"
+   },
+   "feed": "companies/NFLX.json"
+  },
+  {
+   "ticker": "NKE",
+   "name": "NIKE, Inc.",
+   "cik": "0000320187",
+   "last_crawled_at": "2026-11-05T01:04:36+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-10-16",
+    "accession": "0000320187-26-000195"
+   },
+   "feed": "companies/NKE.json"
+  },
+  {
+   "ticker": "NVDA",
+   "name": "NVIDIA CORP",
+   "cik": "0001045810",
+   "last_crawled_at": "2026-11-05T01:04:23+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4/A",
+    "filing_date": "2026-10-13",
+    "accession": "0002152188-26-000007"
+   },
+   "feed": "companies/NVDA.json"
+  },
+  {
+   "ticker": "PYPL",
+   "name": "PayPal Holdings, Inc.",
+   "cik": "0001633917",
+   "last_crawled_at": "2026-11-05T01:04:41+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-10-30",
+    "accession": "0002006416-26-000021"
+   },
+   "feed": "companies/PYPL.json"
+  },
+  {
+   "ticker": "TSLA",
+   "name": "Tesla, Inc.",
+   "cik": "0001318605",
+   "last_crawled_at": "2026-11-05T01:04:29+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "10-Q",
+    "filing_date": "2026-10-22",
+    "accession": "0001628280-26-066775"
+   },
+   "feed": "companies/TSLA.json"
+  },
+  {
+   "ticker": "UNH",
+   "name": "UNITEDHEALTH GROUP INC",
+   "cik": "0000731766",
+   "last_crawled_at": "2026-11-05T01:04:40+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "10-Q",
+    "filing_date": "2026-11-03",
+    "accession": "0000731766-26-000266"
+   },
+   "feed": "companies/UNH.json"
+  },
+  {
+   "ticker": "V",
+   "name": "VISA INC.",
+   "cik": "0001403161",
+   "last_crawled_at": "2026-11-05T01:04:38+00:00",
+   "filings": 13,
+   "latest": {
+    "form": "4",
+    "filing_date": "2026-11-03",
+    "accession": "0001403161-26-000130"
+   },
+   "feed": "companies/V.json"
+  },
+  {
+   "ticker": "XOM",
+   "name": "ExxonMobil Holdings Corp",
+   "cik": "0002115436",
+   "last_crawled_at": "2026-11-05T01:04:34+00:00",
+   "filings": 5,
+   "latest": {
+    "form": "10-Q",
+    "filing_date": "2026-11-02",
+    "accession": "0002115436-26-000020"
+   },
+   "feed": "companies/XOM.json"
+  }
+ ]
+}

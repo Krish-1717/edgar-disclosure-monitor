@@ -178,6 +178,87 @@
   }
   function cikOf(t) { var c = TICKER_DB[t].cik; return c || ('09' + String(hash(t) % 100000000).padStart(8, '0')); }
 
+  /* ---------- real SEC data: static feeds written by the ORACLE crawler ----------
+   * `python -m oracle export --out assets/data/oracle` (see README). Tickers with a feed
+   * show real Tier 1 filings (10-K, 10-Q, 8-K, DEF 14A, Form 4) with real section changes;
+   * everything else, and every ticker without a feed, stays illustrative. If the feeds
+   * can't be fetched (offline, file://) the app silently falls back to the demo data. */
+  var LIVE_BASE = 'assets/data/oracle/';
+  var LIVE_ALIAS = { BRKB: 'BRK-B' };
+  var LIVE_FORMS = { '10-K': 1, '10-Q': 1, '8-K': 1, 'DEF 14A': 1, 'Form 4': 1 };
+  var LIVE_SECTION = { risk_factors: 'Risk Factors', mdna: 'MD&A', market_risk: 'Market Risk', financial_statements: 'Financial Statements' };
+  var LIVE_WEIGHT = { risk_factors: 2, mdna: 2, market_risk: 1, financial_statements: 1 };
+  var LIVE = {}, liveIndex = null, livePending = {}, liveGeneratedAt = null;
+  function liveFetchJson(url) {
+    if (!window.fetch) return Promise.reject(new Error('no fetch'));
+    return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+  }
+  function liveListed(t) { return !!(liveIndex && liveIndex[LIVE_ALIAS[t] || t]); }
+  function liveLoad(t) {
+    if (LIVE[t] || !liveListed(t)) return Promise.resolve();
+    if (!livePending[t]) {
+      livePending[t] = liveFetchJson(LIVE_BASE + liveIndex[LIVE_ALIAS[t] || t]).then(function (feed) {
+        if (feed && feed.filings && feed.filings.length) { LIVE[t] = feed; delete filingCache[t]; }
+      }).catch(function () { /* keep demo data */ });
+    }
+    return livePending[t];
+  }
+  function liveInit(tickers) {
+    var timeout = new Promise(function (res) { setTimeout(res, 3000); });
+    var load = liveFetchJson(LIVE_BASE + 'index.json').then(function (idx) {
+      liveIndex = {};
+      liveGeneratedAt = idx.generated_at || null;
+      (idx.companies || []).forEach(function (c) { liveIndex[c.ticker] = c.feed; });
+      return Promise.all(tickers.map(liveLoad));
+    }).catch(function () { liveIndex = liveIndex || {}; });
+    return Promise.race([load, timeout]);
+  }
+  function liveFilings(t) {
+    var r = rng(hash(t + 'live'));
+    return LIVE[t].filings.filter(function (x) { return x.status === 'fetched'; }).map(function (x) {
+      var code = /^[345]$/.test(x.base_form) ? 'Form ' + x.base_form : x.base_form, fi = formInfo(code);
+      var label = code + (x.is_amendment ? '/A' : '');
+      var w = 0, sum = 0;
+      (x.sections || []).forEach(function (sec) { if (sec.change) { var k = LIVE_WEIGHT[sec.key] || 1; w += k; sum += k * sec.change.change_ratio; } });
+      var mat = w ? sum / w : (fi.tier === 1 ? 0.3 : 0.2);
+      return {
+        id: label + x.id.slice(x.form.length), form: code, date: x.date, cat: fi.cat, group: fi.cat, current: !!x.current,
+        materiality: +Math.min(0.99, mat).toFixed(2), burial: +(0.1 + r() * 0.45).toFixed(2), gap: +(0.1 + r() * 0.5).toFixed(2),
+        live: true, measured: w > 0, accession: x.accession, sec_url: x.sec_url, index_url: x.index_url, sha256: x.sha256, version: x.version,
+        is_amendment: x.is_amendment, amends: x.amends_accession, compared_to: x.compared_to, items: x.items || [], sections: x.sections || []
+      };
+    });
+  }
+  function liveQuote(p) { var q = p.length > 110 ? p.slice(0, 107).replace(/\s+\S*$/, '') + '\u2026' : p; return '\u201c' + q + '\u201d'; }
+  function liveDiffs(f) {
+    var out = [], prior = 'the prior ' + f.form, rank = { risk_factors: 0, mdna: 1, market_risk: 2, financial_statements: 3 };
+    f.sections.slice().sort(function (a, b) { return (a.key in rank ? rank[a.key] : 9) - (b.key in rank ? rank[b.key] : 9); }).forEach(function (sec) {
+      var c = sec.change, name = LIVE_SECTION[sec.key] || sec.title, where = sec.item.replace(/ \(.*\)$/, '') + ' \u00b7 ' + name;
+      if (!c) return;
+      c.added_samples.forEach(function (p, i) {
+        out.push({ type: 'added', section: where, before: null, after: p,
+          text: i ? 'New: ' + liveQuote(p) : c.paragraphs_added + ' new paragraph' + (c.paragraphs_added === 1 ? '' : 's') + ' in ' + name + ' vs ' + prior + '.' });
+      });
+      c.modified_samples.forEach(function (m) {
+        out.push({ type: 'changed', section: where, before: m.before, after: m.after,
+          text: 'Reworded passage in ' + name + ' (' + Math.round(m.similarity * 100) + '% word overlap with ' + prior + ').' });
+      });
+      c.removed_samples.forEach(function (p, i) {
+        out.push({ type: 'removed', section: where, before: p, after: null,
+          text: i ? 'Dropped: ' + liveQuote(p) : c.paragraphs_removed + ' paragraph' + (c.paragraphs_removed === 1 ? '' : 's') + ' dropped from ' + name + ' vs ' + prior + '.' });
+      });
+    });
+    if (out.length) return out;
+    var first = f.sections[0];
+    if (first && !f.compared_to) {
+      return [{ type: 'added', section: first.item.replace(/ \(.*\)$/, '') + ' \u00b7 ' + (LIVE_SECTION[first.key] || first.title), before: null, after: first.excerpt,
+        text: 'Earliest ' + f.form + ' in the crawl window, so there is no prior version to compare yet. ' + f.sections.length + ' sections extracted.' }];
+    }
+    if (first) return [{ type: 'changed', section: f.form, before: null, after: null, text: 'No wording changes detected vs ' + prior + ' (numbers only).' }];
+    return [{ type: 'added', section: formInfo(f.form).name, before: null, after: null,
+      text: f.form + ' filed ' + f.date + (f.items.length ? ' \u00b7 Items ' + f.items.join(', ') : '') + '. Open it on SEC EDGAR for the full document.' }];
+  }
+
   /* ---------- filing set per ticker: base FILING_DATA + seeded filings across all 8 categories ---------- */
   var filingCache = {};
   var FORCE = { NVDA: ['Form 5', 'Form 144'], AAPL: ['SD', 'DEFA14A', 'S-8'], MSFT: ['S-3', '11-K'], GS: ['13F-NT', '13F-HR'], BRKB: ['13F-HR'], JPM: ['13F-HR', '10-D', 'ABS-EE'], BAC: ['13F-HR', '10-D', 'ABS-EE'] };
@@ -194,9 +275,10 @@
   function getFilings(t) {
     if (filingCache[t]) return filingCache[t];
     var r = rng(hash(t)), info = TICKER_DB[t], fin = info.sector === 'Financials';
-    var list = [], used = {}, has = {};
+    var list = [], used = {}, has = {}, live = !!LIVE[t] && !info.fictional;
     function push(f) { var n = 2, id = f.id; while (used[id]) id = f.id + ' #' + n++; used[id] = 1; f.id = id; has[f.form] = 1; list.push(f); }
     function add(form, o) {
+      if (live && LIVE_FORMS[form]) return;      // real filings cover this form
       o = o || {};
       var fi = formInfo(form), m = o.m != null ? o.m : Math.floor(r() * 11), yr = o.y || 24, cat = o.cat || fi.cat;
       push({ id: (o.label || form) + ' ' + MONTHS[m] + '\'' + yr, form: form, item: o.item || null, date: MONTHS[m] + ' ' + (1 + Math.floor(r() * 27)) + ', 20' + yr,
@@ -214,7 +296,8 @@
       add('SC 13G');
       add('EX-99 Earnings'); add('EX-99 Earnings'); add('Transcript'); add('Transcript'); add('Investor Deck'); add('Rating'); add('EX-10');
     } else {
-      (FILING_DATA[t] || FILING_DATA.DEFAULT).forEach(function (f) { var c = {}; for (var k in f) c[k] = f[k]; c.cat = 'financial'; push(c); });
+      if (live) liveFilings(t).forEach(push);
+      else (FILING_DATA[t] || FILING_DATA.DEFAULT).forEach(function (f) { var c = {}; for (var k in f) c[k] = f[k]; c.cat = 'financial'; push(c); });
       maybe(0.6, '8-K', { label: '8-K Item 2.03', item: '2.03', cat: 'debt', mat: 0.3 + r() * 0.3 });
       maybe(0.25, '8-K', { label: '8-K Item 1.01', item: '1.01', cat: 'ma', mat: 0.4 + r() * 0.35 });
       add('DEF 14A', { mat: 0.35 + r() * 0.3 });
@@ -236,6 +319,7 @@
     return list;
   }
   function diffsFor(f, t) {
+    if (f.live) return liveDiffs(f);
     if (FORM_DIFFS[f.form]) return FORM_DIFFS[f.form];
     if (f.cat === 'financial' && /^(10-K|10-Q|8-K)$/.test(f.form)) return DIFFS[t] || DIFFS.DEFAULT;
     return (CATEGORY_DIFFS[f.cat] || CATEGORY_DIFFS.specialized)(t);
@@ -307,11 +391,12 @@
     box.innerHTML = pinned.map(function (t) {
       var s = TICKER_DB[t], up = s.change >= 0, fl = getFilings(t);
       var days = 3 + (hash(t) % 25);
+      if (LIVE[t] && LIVE[t].filings[0]) days = Math.max(0, Math.round((Date.now() - Date.parse(LIVE[t].filings[0].filing_date)) / 864e5));
       return '<div class="stock-card' + (t === activeStock ? ' active' : '') + '" data-t="' + t + '">' +
         '<button type="button" class="sc-main" data-select="' + t + '" aria-pressed="' + (t === activeStock) + '" aria-label="Focus ' + esc(s.name) + '">' +
         '<div class="sc-top"><span class="sc-ticker">' + t + '</span><span class="sc-change ' + (up ? 'up' : 'dn') + '">' + (up ? '+' : '') + s.change.toFixed(1) + '%</span></div>' +
         '<div class="sc-name">' + esc(s.name) + '</div>' +
-        '<div class="sc-mid"><span class="sc-price">$' + s.price.toFixed(2) + '</span><span><span class="sc-badge">' + fl.length + ' filings</span><span class="sc-badge">' + days + 'd ago</span></span></div>' +
+        '<div class="sc-mid"><span class="sc-price">$' + s.price.toFixed(2) + '</span><span><span class="sc-badge">' + fl.length + ' filings</span><span class="sc-badge">' + days + 'd ago</span>' + (LIVE[t] ? '<span class="sc-badge sc-live" title="Real SEC filings crawled by ORACLE">SEC</span>' : '') + '</span></div>' +
         sparkline(t, s.change) + '</button>' +
         '<button type="button" class="sc-remove" data-remove="' + t + '" aria-label="Remove ' + t + ' from watchlist">' +
         '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>';
@@ -346,6 +431,10 @@
     if (!TICKER_DB[t]) return false;
     opts = opts || {};
     if (pinned.indexOf(t) >= 0) { selectStock(t); return true; }
+    if (liveListed(t) && !LIVE[t] && !opts.liveTried) {
+      liveLoad(t).then(function () { opts.liveTried = true; addStock(t, opts); });
+      return true;
+    }
     pinned.push(t);
     reveal[t] = (opts.instant || reduceMotion) ? getFilings(t).length : 0;
     save();
@@ -879,13 +968,13 @@
   });
 
   function sha(seed) { var r = rng(hash(seed)), s = ''; for (var i = 0; i < 64; i++) s += '0123456789abcdef'[Math.floor(r() * 16)]; return s; }
-  function accFor(f, t) { var r = rng(hash(t + f.id + 'acc')); return cikOf(t).slice(-7).replace(/^0+/, '') .padStart(7, '0') + '-' + f.date.slice(-2) + '-' + String(100000 + Math.floor(r() * 899999)); }
+  function accFor(f, t) { if (f.accession) return f.accession; var r = rng(hash(t + f.id + 'acc')); return cikOf(t).slice(-7).replace(/^0+/, '') .padStart(7, '0') + '-' + f.date.slice(-2) + '-' + String(100000 + Math.floor(r() * 899999)); }
   function crawlStages(f, t) {
     var info = TICKER_DB[t], r = rng(hash(t + f.id)), fi = formInfo(f.form), cik = cikOf(t);
     var xml = f.cat === 'insider' && /^Form [345]$/.test(f.form), other = f.cat === 'other';
     var acc = accFor(f, t), kb = Math.round(300 + r() * 700), diffs = diffsFor(f, t);
     var amended = r() < 0.15;
-    return [
+    var stages = [
       { key: 'discover', label: 'Discover', chips: ['EDGAR full-index', 'Submissions API', 'Bulk archive', 'CIK map', 'Amendments'], lines: [
         ['l-info', '> Poll daily index + submissions API for CIK ' + cik + (info.cik ? '' : ' (demo)')],
         ['l-ok', '> Resolved ' + t + ' \u2192 ' + info.name + ' (ticker + historical names mapped)'],
@@ -899,7 +988,7 @@
       { key: 'extract', label: 'Extract', chips: xml ? ['XML ownership'] : other ? ['PDF', 'Transcript text', 'Tables'] : ['HTML', 'iXBRL', 'PDF', 'XLSX', 'Exhibits'], lines: xml ? [
         ['l-ok', '> XML: ownership document \u00b7 ' + (1 + Math.floor(r() * 4)) + ' transactions \u00b7 codes S, M, A'],
         ['l-mut', '  footnotes linked to Table I rows']] : [
-        ['l-ok', '> ' + (other ? 'PDF/text' : 'HTML') + ': ' + (8 + Math.floor(r() * 12)) + ' sections segmented'],
+        ['l-ok', '> ' + (other ? 'PDF/text' : 'HTML') + ': ' + (f.live && f.sections.length ? f.sections.length + ' target' : 8 + Math.floor(r() * 12)) + ' sections segmented'],
         ['l-ok', other ? '> Speaker turns + Q&A separated' : '> iXBRL: ' + (600 + Math.floor(r() * 1400)) + ' tagged facts (us-gaap, dei)'],
         ['l-ok', '> ' + (3 + Math.floor(r() * 9)) + ' financial tables reconstructed \u00b7 concepts normalized'],
         ['l-mut', '  footnotes, risk factors, MD&A and material agreements indexed']] },
@@ -914,13 +1003,36 @@
         ['l-warn', '> Materiality ' + Math.round(f.materiality * 100) + '/100 \u00b7 ' + (f.materiality >= 0.7 ? 'HIGH' : f.materiality >= 0.5 ? 'MEDIUM' : 'LOW')],
         ['l-ok', '> \u2713 Report ready \u00b7 every finding cites filing, period and page']] }
     ];
+    if (f.live) {   // real ORACLE crawl: report what v0 actually did, not the simulated extras
+      var nSec = f.sections.length, nCmp = f.sections.filter(function (x) { return x.change; }).length;
+      stages[0].lines[3] = f.is_amendment ? ['l-warn', '> Amendment v' + f.version + (f.amends ? ' of ' + f.amends : '') + ' \u00b7 original kept'] : ['l-mut', '  original filing (v1)'];
+      stages[1].lines = [
+        ['l-info', '> GET primary document ' + f.sec_url.split('/').pop()],
+        ['l-info', '> GET filing index (index.json): every exhibit and XBRL file listed'],
+        ['l-mut', '  scheduler: 8 req/s (SEC cap 10) \u00b7 User-Agent declared \u00b7 backoff on 429/5xx'],
+        ['l-mut', '  dedupe: sha256 ' + String(f.sha256 || '').slice(0, 12) + '\u2026 stored']];
+      stages[2].lines = nSec ? [
+        ['l-ok', '> HTML \u2192 text: ' + nSec + ' target sections segmented (' + f.sections.map(function (x) { return LIVE_SECTION[x.key] || x.title; }).join(', ') + ')'],
+        ['l-mut', '  table of contents + running page headers suppressed'],
+        ['l-mut', '  iXBRL facts and exhibits: not extracted in v0']] : [
+        ['l-ok', '> ' + (xml ? 'XML ownership document' : 'Document') + ' stored as filed'],
+        ['l-mut', '  section extraction runs on 10-K / 10-Q only in v0']];
+      stages[3].lines = [
+        nCmp ? ['l-info', '> Historical diff: ' + nCmp + ' sections compared with ' + f.compared_to] : ['l-mut', '  no prior ' + f.form + ' in the crawl window to compare'],
+        ['l-info', '> ' + diffs.length + ' passages surfaced (added / reworded / removed)'],
+        ['l-mut', '  other agents: illustrative in this demo']];
+      stages[4].lines = [
+        f.measured ? ['l-warn', '> Change score ' + Math.round(f.materiality * 100) + '/100 \u00b7 share of paragraphs changed'] : ['l-mut', '  change score: n/a (nothing to compare)'],
+        ['l-ok', '> \u2713 Report ready \u00b7 cites ' + f.accession]];
+    }
+    return stages;
   }
 
   function renderCrawler(f, t) {
     var token = panelToken;
     var stages = crawlStages(f, t), diffs = diffsFor(f, t), fi = formInfo(f.form), info = TICKER_DB[t];
     var secs = (1.4 + (hash(f.id + t) % 30) / 10).toFixed(1), acc = accFor(f, t), url = edgarUrl(t, f.form);
-    var src = info.cik ? 'https://www.sec.gov/Archives/edgar/data/' + String(+info.cik) + '/' + acc.replace(/-/g, '') + '/' : 'demo://' + t.toLowerCase() + '/' + acc;
+    var src = f.live ? f.sec_url : info.cik ? 'https://www.sec.gov/Archives/edgar/data/' + String(+info.cik) + '/' + acc.replace(/-/g, '') + '/' : 'demo://' + t.toLowerCase() + '/' + acc;
     panelBody.innerHTML =
       '<p class="form-desc"><b>' + esc(fi.name) + '.</b> ' + esc(fi.desc) + '</p>' +
       '<ol class="stages">' + stages.map(function (s, i) {
@@ -932,10 +1044,13 @@
       '<div class="cites">' + diffs.slice(0, 3).map(function (d, i) { return '<button type="button" class="cite" data-goto="diff">[' + (i + 1) + '] ' + esc(d.section) + '</button>'; }).join('') + '</div>' +
       '<div class="stats"><div class="stat"><b class="' + matClass(f.materiality) + '">' + Math.round(f.materiality * 100) + '</b><span>Materiality</span></div>' +
       '<div class="stat"><b class="c-amber">' + diffs.length + '</b><span>Changes</span></div>' +
-      '<div class="stat"><b class="c-accent">' + secs + 's</b><span>Crawl time</span></div></div>' +
-      '<dl class="prov"><dt>Source</dt><dd class="mono">' + esc(src) + '</dd><dt>SHA-256</dt><dd class="mono">' + sha(t + f.id).slice(0, 32) + '\u2026</dd>' +
-      '<dt>Period</dt><dd>' + esc(f.date) + '</dd><dt>Version</dt><dd>v1 \u00b7 original preserved</dd></dl></div>' +
-      '<p class="panel-foot">' + (url ? '<a href="' + url + '" target="_blank" rel="noopener">View ' + esc(t) + ' ' + esc(f.form) + ' filings on SEC EDGAR</a> \u00b7 ' : 'Fictional demo company: no EDGAR record. ') + 'Demo analysis is illustrative.</p>';
+      (f.live ? '<div class="stat"><b class="c-accent">' + f.sections.length + '</b><span>Sections</span></div></div>'
+        : '<div class="stat"><b class="c-accent">' + secs + 's</b><span>Crawl time</span></div></div>') +
+      '<dl class="prov"><dt>Source</dt><dd class="mono">' + esc(src) + '</dd><dt>SHA-256</dt><dd class="mono">' + (f.sha256 || sha(t + f.id)).slice(0, 32) + '\u2026</dd>' +
+      '<dt>Period</dt><dd>' + esc(f.date) + '</dd><dt>Version</dt><dd>' + (f.live ? 'v' + f.version + (f.is_amendment && f.amends ? ' \u00b7 amends ' + esc(f.amends) : ' \u00b7 original') : 'v1 \u00b7 original preserved') + '</dd></dl></div>' +
+      (f.live
+        ? '<p class="panel-foot"><span class="live-tag">Real SEC filing</span> <a href="' + esc(f.index_url || f.sec_url) + '" target="_blank" rel="noopener">Open ' + esc(f.accession) + ' on SEC EDGAR</a> \u00b7 Crawled by ORACLE. ' + (f.measured ? 'Materiality here is the measured share of changed paragraphs; burial and attention gap are illustrative.' : 'No earlier version to compare, so the scores are placeholders.') + '</p>'
+        : '<p class="panel-foot">' + (url ? '<a href="' + url + '" target="_blank" rel="noopener">View ' + esc(t) + ' ' + esc(f.form) + ' filings on SEC EDGAR</a> \u00b7 ' : 'Fictional demo company: no EDGAR record. ') + 'Demo analysis is illustrative.</p>');
     var log = $('crawl-log'), items = panelBody.querySelectorAll('.stage'), seq = [];
     stages.forEach(function (s, i) {
       seq.push({ stage: i, start: true });
@@ -974,7 +1089,8 @@
     var diffs = diffsFor(f, t);
     function count(ty) { return diffs.filter(function (d) { return d.type === ty; }).length; }
     var shown = diffs.filter(function (d) { return diffFilter === 'all' || d.type === diffFilter; });
-    panelBody.innerHTML = '<div class="diff-head">Comparing <b>' + esc(f.id) + '</b> with the prior ' + esc(f.form) + '</div>' +
+    panelBody.innerHTML = '<div class="diff-head">' + (f.live && !f.compared_to ? 'No earlier ' + esc(f.form) + ' in the crawl window for <b>' + esc(f.id) + '</b>'
+      : 'Comparing <b>' + esc(f.id) + '</b> with the prior ' + esc(f.form)) + (f.live ? ' <span class="live-tag">Real SEC text</span>' : '') + '</div>' +
       '<div class="diff-chips" role="group" aria-label="Filter changes">' +
       [['all', 'All', diffs.length], ['added', 'Added', count('added')], ['changed', 'Changed', count('changed')], ['removed', 'Removed', count('removed')]].map(function (c) {
         return '<button type="button" class="diff-chip" data-filter="' + c[0] + '" aria-pressed="' + (diffFilter === c[0]) + '">' + c[1] + ' (' + c[2] + ')</button>';
@@ -1289,9 +1405,15 @@
   var fromUrl = (new URLSearchParams(location.search).get('t') || '').toUpperCase().split(',').filter(function (t) { return TICKER_DB[t]; });
   var saved = store(WL_KEY);
   var initial = fromUrl.length ? fromUrl : (Array.isArray(saved) ? saved.filter(function (t) { return TICKER_DB[t]; }) : []);
-  initial.forEach(function (t) { addStock(t, { instant: true }); });
   renderSidebar();
   updateTopbar();
   setIdleStatus();
   updateGraph();
+  liveInit(initial).then(function () {
+    initial.forEach(function (t) { addStock(t, { instant: true, liveTried: true }); });
+    renderSidebar();
+    updateTopbar();
+    setIdleStatus();
+    updateGraph();
+  });
 })();

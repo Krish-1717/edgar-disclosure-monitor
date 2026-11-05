@@ -96,6 +96,8 @@ python3 -m http.server 8766 --bind 127.0.0.1   # from repo root, open http://127
 | `SHARED_ENTITIES` | Illustrative shared holders / executives / deals linking clusters |
 | `AI_RESPONSES` | Deterministic mock chat responses |
 
+**Real SEC data:** `assets/data/oracle/` holds static feeds written by the ORACLE crawler (`python -m oracle export --out assets/data/oracle`, see README). `app.js` (`LIVE`, `liveInit`, `liveFilings`, `liveDiffs`) loads them; tickers with a feed show real Tier 1 filings (`f.live === true`) instead of the mock ones, everything else stays illustrative. Never hand-edit the feed JSON.
+
 Workspace modes: Chat, Research (plan + cited summary), Report (brief + Download .md). Commands: `add NVDA`, `remove NVDA`, `load demo`.
 Watchlist persists in localStorage (`edm_watchlist_v1`); `app.html?t=NVDA,MSFT` deep-links a watchlist.
 

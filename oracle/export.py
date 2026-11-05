@@ -184,6 +184,7 @@ def build_company_feed(store: Store, ticker: str, limit: int = 100) -> dict | No
             "current": False,
             "status": r["status"],
             "sec_url": r["primary_doc_url"],
+            "sha256": r["sha256"],
             "index_url": r["index_url"].replace("index.json", f"{r['accession']}-index.htm") if r["index_url"] else None,
             "compared_to": prev["accession"] if prev else None,
             "sections": sections,

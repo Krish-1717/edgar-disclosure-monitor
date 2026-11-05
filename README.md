@@ -34,7 +34,19 @@ cp .env.example .env        # set ORACLE_USER_AGENT="Your Name you@example.com"
 .venv/bin/python -m oracle serve --port 8000      # API on http://127.0.0.1:8000/docs
 ```
 
-**Getting real data onto the website.** GitHub Pages is static, so visitors can't reach a FastAPI server on your machine. `python -m oracle export --out DIR` writes `DIR/index.json` plus `DIR/companies/{TICKER}.json` (pure ASCII, about 6-40 KB per company), which the site can `fetch()` from its own origin with no backend and no CORS. Each filing in a feed uses the `FILING_DATA` fields from `assets/js/app.js` (`id`, `form`, `date`, `group`, `current`) plus `accession`, `sec_url`, `index_url`, amendment info, and per-section `excerpt` and `change`. `change` compares the section with the previous filing of the same form: paragraphs added / modified / removed, `change_ratio`, `word_delta_pct`, and up to 3 `added_samples` and `modified_samples` (`{before, after}`, which matches the demo's `DIFFS`). `GET /companies/{ticker}/feed` serves the same payload live. The default output folder `data/oracle/export` is gitignored; to publish, export to a folder the site serves (for example `assets/data/oracle`) and commit it.
+**Getting real data onto the website.** GitHub Pages is static, so visitors can't reach a FastAPI server on your machine. `python -m oracle export --out DIR` writes `DIR/index.json` plus `DIR/companies/{TICKER}.json` (pure ASCII, about 6-40 KB per company), which the site can `fetch()` from its own origin with no backend and no CORS. Each filing in a feed uses the `FILING_DATA` fields from `assets/js/app.js` (`id`, `form`, `date`, `group`, `current`) plus `accession`, `sec_url`, `index_url`, amendment info, and per-section `excerpt` and `change`. `change` compares the section with the previous filing of the same form: paragraphs added / modified / removed, `change_ratio`, `word_delta_pct`, and up to 3 `added_samples` and `modified_samples` (`{before, after}`, which matches the demo's `DIFFS`). `GET /companies/{ticker}/feed` serves the same payload live. The default output folder `data/oracle/export` is gitignored.
+
+**The demo app already uses these feeds.** `app.html` loads `assets/data/oracle/index.json` and, for each watchlisted ticker with a feed, shows its real Tier 1 filings (10-K, 10-Q, 8-K, DEF 14A, Form 4) in the hive, with real SEC links, accession numbers, SHA-256 hashes, amendment versions and the real section changes in the Changes tab (marked "Real SEC filing"). Forms the crawler does not cover yet, fictional tickers (`XQRN`, `XHLD`) and foreign filers (`TSM`, `ASML`) stay illustrative, and the app falls back to the demo data if the feeds can't be fetched. To refresh the published data:
+
+```bash
+T="NVDA AAPL MSFT GOOGL META AMZN TSLA JPM BAC GS NFLX LLY XOM AMD NKE BRK-B V MA UNH PYPL"
+.venv/bin/python -m oracle crawl $T --forms 10-K,10-Q --limit 6
+.venv/bin/python -m oracle crawl $T --forms 8-K --limit 3
+.venv/bin/python -m oracle crawl $T --forms "DEF 14A" --limit 1
+.venv/bin/python -m oracle crawl $T --forms 4 --limit 3
+.venv/bin/python -m oracle export $T --out assets/data/oracle    # about 1 MB, pure ASCII
+python3 fix_encoding.py --check && git add assets/data/oracle && git commit -m "data: refresh ORACLE feeds"
+```
 
 | Stage | Module | What it does |
 |-------|--------|--------------|

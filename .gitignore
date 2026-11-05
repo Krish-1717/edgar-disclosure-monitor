@@ -35,6 +35,6 @@ dist/
 build/
 
 # ORACLE crawler output (SQLite DB + downloaded filings)
-data/
+/data/
 *.db
 *.sqlite3
