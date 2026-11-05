@@ -29,7 +29,7 @@
 <link rel="manifest" href="site.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
 <link rel="stylesheet" href="assets/css/site.css">
 <link rel="stylesheet" href="assets/css/app.css">
 </head>
@@ -95,7 +95,8 @@
     </section>
 
     <section class="graph-area" id="graph-area" tabindex="-1" aria-label="Filing network. Each company is a cluster of filings grouped by category; shared shareholders, executives and deals connect clusters.">
-      <svg id="hive" role="group" aria-label="Hive network graph"></svg>
+      <canvas id="hive-shell" aria-hidden="true"></canvas>
+      <svg id="hive" role="group" aria-label="Hive network graph. The outer shell holds every SEC-listed company; your watchlist sits inside."></svg>
       <section class="crawl-console glass" id="crawl-console" aria-label="Crawler console" hidden>
         <header><span class="dot-live" aria-hidden="true"></span><span class="mono" id="cc-title">oracle-crawler</span><span class="mono cc-stats" id="cc-stats">idle</span>
           <button type="button" class="icon-btn sm" id="console-close" aria-label="Close crawler console"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></header>
@@ -104,8 +105,8 @@
       <div class="graph-empty" id="graph-empty">
         <div class="glass ge-card">
           <span class="eyebrow">Hive mind</span>
-          <h1>Your network is empty.</h1>
-          <p>Add companies and watch the crawler pull every filing they make, across all 8 categories, into clusters that connect through shared holders, executives and deals.</p>
+          <h1>Every dot is a public company.</h1>
+          <p>All 10,000+ SEC-listed companies, banded by exchange. Drag to spin it, click any dot or search to open a company, and the crawler pulls its full filing history live from SEC EDGAR.</p>
           <button type="button" class="btn btn-cta" id="load-demo">Load demo hive</button>
         </div>
       </div>

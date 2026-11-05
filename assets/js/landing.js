@@ -244,7 +244,7 @@
       var gs = 30 + Math.sin(t * 2) * 6;
       ctx.globalAlpha = 0.9 * sq.z; ctx.drawImage(sprite, sq.X - gs / 2, sq.Y - gs / 2, gs, gs); ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
-      ctx.font = '500 10px "IBM Plex Mono", monospace'; ctx.fillStyle = 'rgba(245,201,122,' + (0.9 * sq.z).toFixed(2) + ')';
+      ctx.font = '500 10px "Geist Mono", monospace'; ctx.fillStyle = 'rgba(245,201,122,' + (0.9 * sq.z).toFixed(2) + ')';
       ctx.fillText('SEC EDGAR', sq.X + 10, sq.Y - 8);
       ctx.globalCompositeOperation = 'lighter';
     }

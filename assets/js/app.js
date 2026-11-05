@@ -277,7 +277,19 @@
   function pad10(c) { return String(+c).padStart(10, '0'); }
   function fmtDate(iso) { var p = String(iso || '').split('-'); return p.length === 3 ? MONTHS[+p[1] - 1] + ' ' + (+p[2]) + ', ' + p[0] : String(iso || ''); }
   function daysAgo(iso) { return Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 864e5)); }
-  function titleCase(s) { return String(s || '').toLowerCase().replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); }).replace(/\b(And|Of|In|Or|For|The|Nec)\b/g, function (m) { return m === 'Nec' ? 'NEC' : m.toLowerCase(); }); }
+  var KEEP_UPPER = { AG: 1, SA: 1, NV: 1, SE: 1, PLC: 1, LLC: 1, LP: 1, LTD: 1, REIT: 1, ETF: 1, USA: 1, US: 1, NEC: 1, ADR: 1, II: 1, III: 1, IV: 1, AI: 1, NA: 1 };
+  var NICE = { INC: 'Inc.', CORP: 'Corp.', CO: 'Co.', LTD: 'Ltd.', PLC: 'plc', HOLDINGS: 'Holdings', AND: 'and', OF: 'of', THE: 'the', FOR: 'for', IN: 'in' };
+  function titleCase(s) {
+    s = String(s || '').replace(/\s*\/[A-Z]{2,3}\/?\s*$/, '').trim();   // drop EDGAR state suffixes like "/DE/" or "/NEW"
+    if (/[a-z]/.test(s)) return s;                                         // already mixed case: keep the filer's own casing
+    return s.split(/(\s+|-|&|,)/).map(function (w, i) {
+      var u = w.replace(/[.,]/g, '').toUpperCase();
+      if (!/[A-Z]/.test(u)) return w;
+      if (NICE[u] && (i > 0 || !/^(AND|OF|THE|FOR|IN)$/.test(u))) return NICE[u] + (w.slice(-1) === ',' ? ',' : '');
+      if (KEEP_UPPER[u] || (u.length <= 3 && !/[AEIOU]/.test(u)) || /\d/.test(u) || u.length <= 2) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join('').replace(/\.\./g, '.');
+  }
   function itemNames(items) { return items.map(function (i) { return i + (ITEM_8K[i] ? ' ' + ITEM_8K[i] : ''); }); }
 
   function loadUniverse() {
@@ -318,7 +330,7 @@
       s.status = 'ok';
       s.ms = Date.now() - s.started;
       if (!info.sector && d.sicDescription) info.sector = titleCase(d.sicDescription);
-      if (info.universe && d.name) info.name = titleCase(d.name).replace(/\b(Inc|Corp|Co|Ltd|Plc|Llc|Lp|Nv|Sa|Ag)\b\.?/g, function (m) { return m.toUpperCase() === 'INC' ? 'Inc.' : m; });
+      if (info.universe && d.name) info.name = titleCase(d.name);
       delete filingCache[t];
     }).catch(function (e) { s.status = 'error'; s.error = String((e && e.message) || e); });
     return s.promise;
@@ -667,7 +679,7 @@
   /* =====================================================================
    * TABS: the hive overview plus one tab per company (each with its own chat)
    * ===================================================================== */
-  var openTabs = [], activeTab = 'hive', threads = {}, TABS_KEY = 'edm_tabs_v1', legendWanted = window.innerWidth >= 900;
+  var openTabs = [], activeTab = 'hive', threads = {}, TABS_KEY = 'edm_tabs_v1', legendWanted = false;   // the explorer opens from the list button; the globe gets the room
   function saveTabs() { store(TABS_KEY, { open: openTabs, active: activeTab }); }
   function renderTabs() {
     var hiveOn = activeTab === 'hive';
@@ -982,6 +994,99 @@
   var cam = { yaw: 0.6, pitch: -0.3, zoom: 0.6, ty: 0.6, tp: -0.3, tz: 1, pivot: [0, 0, 0], tpivot: [0, 0, 0], auto: true, focus: null, userZoom: false };
   var SPHERE_R = 0, CLUSTER_R = 120, FOCAL = 1400, pulses = [], dragMoved = false, rafId = 0, lastT = 0, autoTimer = 0;
 
+  /* ---------- the outer shell: every SEC-listed company as a point ----------
+   * Drawn on a canvas under the SVG (10,000+ points stay smooth). Points follow
+   * universe.json order (exchange, then ticker) along the spiral, so exchanges form
+   * bands and tickers run alphabetically. Hover shows the company; click opens its tab. */
+  var shellCanvas = $('hive-shell'), shellCtx = shellCanvas && shellCanvas.getContext ? shellCanvas.getContext('2d') : null;
+  var SHELL = null, shellHover = -1, DPR = Math.min(2, window.devicePixelRatio || 1);
+  var EX_RGB = { NYSE: '150,163,230', Nasdaq: '120,190,210', CBOE: '200,180,140', TXSE: '200,160,190', OTC: '110,116,134' };
+  function buildShell() {
+    if (!universeRows.length || (SHELL && SHELL.n === universeRows.length)) return;
+    var n = universeRows.length, pts = spiral(n), ranges = [], i;
+    SHELL = { n: n, pos: new Float32Array(n * 3), sx: new Float32Array(n), sy: new Float32Array(n), d: new Float32Array(n), ranges: ranges, idx: {} };
+    for (i = 0; i < n; i++) {
+      SHELL.pos[i * 3] = pts[i][0]; SHELL.pos[i * 3 + 1] = pts[i][1]; SHELL.pos[i * 3 + 2] = pts[i][2];
+      SHELL.idx[universeRows[i][0]] = i;
+      var ex = universeRows[i][3] || '';
+      if (!ranges.length || ranges[ranges.length - 1].ex !== ex) ranges.push({ ex: ex, a: i, b: i + 1 }); else ranges[ranges.length - 1].b = i + 1;
+    }
+    kick();
+  }
+  function shellR() { return Math.max(330, (SPHERE_R + CLUSTER_R) * 1.35); }
+  function shellIndexOf(t) {
+    if (!SHELL) return -1;
+    var k = SHELL.idx[t]; if (k != null) return k;
+    k = SHELL.idx[t.replace(/^(BRK)(B)$/, '$1-$2')]; return k != null ? k : -1;
+  }
+  function drawShell() {
+    if (!shellCtx) return;
+    var cw = Math.round(W * DPR), ch = Math.round(H * DPR);
+    if (shellCanvas.width !== cw || shellCanvas.height !== ch) { shellCanvas.width = cw; shellCanvas.height = ch; }
+    shellCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    shellCtx.clearRect(0, 0, W, H);
+    if (!SHELL) return;
+    var c = _ctx, P = SHELL.pos, Rs = shellR(), n = SHELL.n, i;
+    var pv = c.pv, sk = Math.min(1.7, Math.sqrt(c.k)), dim = cam.focus ? 0.4 : 1;
+    for (i = 0; i < n; i++) {
+      var x = P[i * 3] * Rs - pv[0], y = P[i * 3 + 1] * Rs - pv[1], z = P[i * 3 + 2] * Rs - pv[2];
+      var x1 = x * c.cyw + z * c.syw, z1 = -x * c.syw + z * c.cyw, y2 = y * c.cp - z1 * c.sp, z2 = y * c.sp + z1 * c.cp;
+      var den = FOCAL - z2 * c.k;
+      if (den < 160) { SHELL.d[i] = -1; continue; }
+      var s = FOCAL / den;
+      SHELL.sx[i] = c.cx + x1 * s * c.k; SHELL.sy[i] = c.cy + y2 * s * c.k;
+      SHELL.d[i] = (z2 / Rs + 1) / 2;   // 0 = far side, 1 = facing you
+    }
+    // four depth bands per exchange keep fillStyle changes to a few dozen per frame
+    SHELL.ranges.forEach(function (r) {
+      var rgb = EX_RGB[r.ex] || '120,128,160';
+      for (var band = 0; band < 4; band++) {
+        var a = (0.08 + 0.55 * (band + 0.5) / 4) * dim, rad = (0.55 + 0.75 * (band + 0.5) / 4) * sk;
+        shellCtx.fillStyle = 'rgba(' + rgb + ',' + a.toFixed(3) + ')';
+        for (var j = r.a; j < r.b; j++) {
+          var d = SHELL.d[j];
+          if (d < 0 || (d >= 1 ? 3 : Math.floor(d * 4)) !== band) continue;
+          shellCtx.fillRect(SHELL.sx[j] - rad, SHELL.sy[j] - rad, rad * 2, rad * 2);
+        }
+      }
+    });
+    // watchlisted companies: bright dot on the shell, wired to their filing sphere
+    pinned.forEach(function (t) {
+      var k = shellIndexOf(t), hub = nodeMap['hub:' + t];
+      if (k < 0 || SHELL.d[k] < 0) return;
+      var on = !cam.focus || cam.focus === t;
+      if (hub && hub.sx != null && !hub.behind) {
+        shellCtx.strokeStyle = 'rgba(103,232,249,' + ((on ? 0.38 : 0.12) * (0.4 + 0.6 * SHELL.d[k])).toFixed(3) + ')';
+        shellCtx.lineWidth = 1;
+        shellCtx.setLineDash([3, 5]);
+        shellCtx.beginPath(); shellCtx.moveTo(SHELL.sx[k], SHELL.sy[k]); shellCtx.lineTo(hub.sx, hub.sy); shellCtx.stroke();
+        shellCtx.setLineDash([]);
+      }
+      shellCtx.fillStyle = 'rgba(238,241,255,' + ((on ? 0.95 : 0.4) * (0.35 + 0.65 * SHELL.d[k])).toFixed(3) + ')';
+      shellCtx.beginPath(); shellCtx.arc(SHELL.sx[k], SHELL.sy[k], 2.6 * sk, 0, Math.PI * 2); shellCtx.fill();
+    });
+    if (shellHover >= 0 && SHELL.d[shellHover] >= 0) {
+      shellCtx.strokeStyle = 'rgba(238,241,255,0.95)'; shellCtx.lineWidth = 1.5;
+      shellCtx.beginPath(); shellCtx.arc(SHELL.sx[shellHover], SHELL.sy[shellHover], 6, 0, Math.PI * 2); shellCtx.stroke();
+    }
+  }
+  function shellPick(clientX, clientY) {
+    if (!SHELL) return -1;
+    var r = area.getBoundingClientRect(), x = clientX - r.left, y = clientY - r.top, best = -1, bd = 64;
+    for (var i = 0; i < SHELL.n; i++) {
+      if (SHELL.d[i] < 0.5) continue;   // only the side facing you
+      var dx = SHELL.sx[i] - x, dy = SHELL.sy[i] - y, dd = dx * dx + dy * dy;
+      if (dd < bd) { bd = dd; best = i; }
+    }
+    return best;
+  }
+  function shellTip(i, ev) {
+    var u = universeRows[i];
+    tooltip.innerHTML = '<b>' + esc(u[0]) + '</b> \u00b7 ' + esc(titleCase(u[1])) + '<br>' + esc(u[3] || 'Unlisted') + ' \u00b7 CIK ' + u[2] + '<br><span style="color:#949db2">Click to open its live SEC filings</span>';
+    tooltip.classList.add('visible');
+    moveTip(ev);
+  }
+
   function nodeR(d) {
     if (d.kind === 'hub') return 22;
     if (d.kind === 'cat') return 4;
@@ -1041,6 +1146,19 @@
       pauseAuto();
       kick();
     });
+    el.addEventListener('pointermove', function (e) {
+      if (drag || !SHELL) return;
+      var onNode = e.target.closest && e.target.closest('g.node');
+      var k = onNode ? -1 : shellPick(e.clientX, e.clientY);
+      if (k !== shellHover) { shellHover = k; area.classList.toggle('over-shell', k >= 0); kick(); }
+      if (k >= 0) shellTip(k, e); else if (!onNode) hideTip();
+    });
+    el.addEventListener('pointerleave', function () { if (shellHover >= 0) { shellHover = -1; area.classList.remove('over-shell'); hideTip(); kick(); } });
+    el.addEventListener('click', function (e) {
+      if (dragMoved || (e.target.closest && e.target.closest('g.node'))) return;
+      var k = shellHover >= 0 ? shellHover : shellPick(e.clientX, e.clientY);
+      if (k >= 0) { hideTip(); shellHover = -1; area.classList.remove('over-shell'); openTab(universeRows[k][0]); }
+    });
     function up(e) { if (drag && e.pointerId === drag.id) { drag = null; area.classList.remove('rotating'); setTimeout(function () { dragMoved = false; }, 0); } }
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
@@ -1081,7 +1199,7 @@
     var w = Math.max(200, W - left - right), h = Math.max(160, H - bottom);
     return { x: left + w / 2, y: h / 2, w: w, h: h };
   }
-  function sceneR() { return SPHERE_R + CLUSTER_R; }
+  function sceneR() { return SHELL ? shellR() : SPHERE_R + CLUSTER_R; }
   function targetZoom() {
     var v = viewBox(), r = cam.focus ? (nodeMap['hub:' + cam.focus] ? nodeMap['hub:' + cam.focus].rc : CLUSTER_R) * 1.15 : sceneR() + 30;
     return Math.max(0.25, Math.min(4, Math.min(v.w, v.h) * 0.44 / Math.max(60, r)));
@@ -1176,7 +1294,7 @@
       if (d.kind === 'hub') {
         g.append('circle').attr('class', 'halo').attr('r', 46).attr('fill', 'url(#hub-halo)');
         g.append('circle').attr('r', 22).attr('fill', '#0b0e1f').attr('stroke', '#c9ceff').attr('stroke-width', 1.6).attr('filter', 'url(#soft-glow)');
-        g.append('text').text(d.label).attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', d.label.length > 4 ? 9 : 11).attr('font-weight', 600).attr('fill', '#eef1f8').attr('font-family', 'IBM Plex Mono, monospace');
+        g.append('text').text(d.label).attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', d.label.length > 4 ? 9 : 11).attr('font-weight', 600).attr('fill', '#eef1f8').attr('font-family', 'Geist Mono, monospace');
         g.append('circle').attr('class', 'focus-ring').attr('r', 27);
       } else if (d.kind === 'cat') {
         g.append('circle').attr('r', 4).attr('fill', CATEGORIES[d.cat].color).attr('opacity', 0.9);
@@ -1281,6 +1399,7 @@
     setupProjection();
     var focus = cam.focus, sk = Math.sqrt(_ctx.k);
     gNodesData.forEach(function (n) { project(n.p, n); });
+    drawShell();
     function nodeOpacity(d) {
       if (d.behind) return 0;
       var o = 0.22 + 0.78 * d.depth;
@@ -1310,10 +1429,10 @@
   }
   // Faint latitude / longitude rings make the sphere legible while it turns.
   function renderGrid() {
-    var R = SPHERE_R > 0 ? SPHERE_R : (pinned.length ? CLUSTER_R * 1.25 : 0), paths = [], tmp = {};
+    var R = SHELL ? shellR() : SPHERE_R > 0 ? SPHERE_R : (pinned.length ? CLUSTER_R * 1.25 : 0), paths = [], tmp = {};
     if (R > 0) {
       var c = cam.focus && nodeMap['hub:' + cam.focus] ? nodeMap['hub:' + cam.focus] : null;
-      var center = SPHERE_R > 0 ? [0, 0, 0] : (c ? c.t : [0, 0, 0]);
+      var center = SHELL || SPHERE_R > 0 ? [0, 0, 0] : (c ? c.t : [0, 0, 0]);
       var lat, lon, i, d;
       for (lat = -60; lat <= 60; lat += 30) {
         d = ''; var cl = Math.cos(lat * Math.PI / 180), sl = Math.sin(lat * Math.PI / 180);
@@ -2137,6 +2256,7 @@
   updateTopbar();
   setIdleStatus();
   updateGraph();
+  loadUniverse().then(function () { buildShell(); if (!cam.userZoom) cam.tz = targetZoom(); kick(); });
   Promise.all([loadUniverse(), liveInit([])]).then(function () {
     var initial = (fromUrl.length ? fromUrl : (Array.isArray(saved) ? saved : [])).map(ensureTicker).filter(Boolean);
     initial.forEach(function (t) { addStock(t, { instant: true, noSelect: true }); });
