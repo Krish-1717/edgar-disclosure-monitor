@@ -96,6 +96,8 @@ python3 -m http.server 8766 --bind 127.0.0.1   # from repo root, open http://127
 | `SHARED_ENTITIES` | Illustrative shared holders / executives / deals linking clusters |
 | `AI_RESPONSES` | Deterministic mock chat responses |
 
+**App structure (v6):** tabs (`openTabs`, `activeTab`, `switchTab`; one chat thread per tab in `threads`), filings side panel + live crawler (`renderFilings`, `startCrawl`, `CRAWL`), any public company via the browser (`SEC`, `secLoad`, `secRows`, `realFilings`, `UNIVERSE` from `assets/data/oracle/universe.json`), 3D sphere hive (`cam`, `spiral`, `buildData`, `project`, `render`, `focusHub`; drag/arrow keys rotate, wheel zooms), real-data chat (`respondReal`, `respondRealReport`). Fictional `XQRN`/`XHLD` keep the mock path.
+
 **Real SEC data:** `assets/data/oracle/` holds static feeds written by the ORACLE crawler (`python -m oracle export --out assets/data/oracle`, see README). `app.js` (`LIVE`, `liveInit`, `liveFilings`, `liveDiffs`) loads them; tickers with a feed show real Tier 1 filings (`f.live === true`) instead of the mock ones, everything else stays illustrative. Never hand-edit the feed JSON.
 
 Workspace modes: Chat, Research (plan + cited summary), Report (brief + Download .md). Commands: `add NVDA`, `remove NVDA`, `load demo`.

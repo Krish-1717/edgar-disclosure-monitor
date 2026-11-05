@@ -207,6 +207,37 @@ def build_company_feed(store: Store, ticker: str, limit: int = 100) -> dict | No
     }
 
 
+EXCHANGE_ORDER = {"NYSE": 0, "Nasdaq": 1, "CBOE": 2, "TXSE": 3, "OTC": 4}
+
+
+def build_universe(rows: list[list]) -> dict:
+    """All SEC-registered companies with a ticker (company_tickers_exchange.json).
+
+    Compact for the static site: ``[ticker, name, cik, exchange]`` rows, listed
+    exchanges first, then OTC / unlisted, alphabetical within each.
+    """
+    seen, out = set(), []
+    for cik, name, ticker, exchange in rows:
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        out.append([ticker, name, int(cik), exchange or ""])
+    out.sort(key=lambda r: (EXCHANGE_ORDER.get(r[3], 9), r[0]))
+    return {"schema": FEED_SCHEMA, "generated_at": utcnow(), "source": "SEC company_tickers_exchange.json",
+            "fields": ["ticker", "name", "cik", "exchange"], "count": len(out), "companies": out}
+
+
+def write_universe(client, out_path: str | pathlib.Path) -> dict:
+    from .discovery import TICKERS_EXCHANGE_URL
+
+    data = client.get_json(TICKERS_EXCHANGE_URL)
+    universe = build_universe(data["data"])
+    path = pathlib.Path(out_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(universe, ensure_ascii=True, separators=(",", ":")), encoding="ascii")
+    return universe
+
+
 def write_export(store: Store, out_dir: str | pathlib.Path, tickers: list[str] | None = None) -> dict:
     out = pathlib.Path(out_dir)
     (out / "companies").mkdir(parents=True, exist_ok=True)

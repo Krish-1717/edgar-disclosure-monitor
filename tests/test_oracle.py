@@ -442,6 +442,22 @@ def test_export_feed_matches_site_schema(env):
     assert pre.headers["access-control-allow-origin"] == "http://127.0.0.1:8766"
 
 
+def test_universe_file(tmp_path):
+    from oracle.export import write_universe
+    rows = {"fields": ["cik", "name", "ticker", "exchange"], "data": [
+        [1045810, "NVIDIA CORP", "NVDA", "Nasdaq"], [320193, "Apple Inc.", "AAPL", "Nasdaq"],
+        [1067983, "BERKSHIRE HATHAWAY INC", "BRK-B", "NYSE"], [999, "Tiny Co \u00e9", "TINY", "OTC"],
+        [1045810, "NVIDIA CORP", "NVDA", "Nasdaq"], [5, "No Ticker", "", None]]}
+    with respx.mock() as router:
+        router.get(discovery.TICKERS_EXCHANGE_URL).respond(json=rows)
+        client, _ = make_client()
+        u = write_universe(client, tmp_path / "u.json")
+    assert [r[0] for r in u["companies"]] == ["BRK-B", "AAPL", "NVDA", "TINY"]   # NYSE, Nasdaq, OTC
+    raw = (tmp_path / "u.json").read_bytes()
+    raw.decode("ascii")
+    assert json.loads(raw)["count"] == 4
+
+
 # -- CLI ------------------------------------------------------------------------
 def test_cli_crawl_and_list(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ORACLE_USER_AGENT", fx.UA)

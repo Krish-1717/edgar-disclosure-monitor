@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+TICKERS_EXCHANGE_URL = "https://www.sec.gov/files/company_tickers_exchange.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"
 

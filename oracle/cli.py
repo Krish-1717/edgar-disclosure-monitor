@@ -40,6 +40,9 @@ def _parser() -> argparse.ArgumentParser:
     x.add_argument("--out", type=pathlib.Path, default=pathlib.Path("data/oracle/export"),
                    help="output folder (default data/oracle/export, gitignored)")
 
+    u = sub.add_parser("universe", help="write every SEC-listed company (ticker, name, CIK, exchange) for site search")
+    u.add_argument("--out", type=pathlib.Path, default=pathlib.Path("data/oracle/export/universe.json"))
+
     s = sub.add_parser("serve", help="run the read API")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
@@ -111,6 +114,16 @@ def _cmd_export(args, settings: Settings) -> int:
     return 0
 
 
+def _cmd_universe(args, settings: Settings) -> int:
+    from .client import SecClient
+    from .export import write_universe
+
+    with SecClient(settings.user_agent, max_rps=settings.max_rps) as client:
+        u = write_universe(client, args.out)
+    print(f"wrote {u['count']} companies to {args.out} ({args.out.stat().st_size / 1024:.0f} KB)")
+    return 0
+
+
 def _cmd_serve(args, settings: Settings) -> int:
     import uvicorn
 
@@ -129,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = Settings.from_env()
         if args.db:
             settings.db_path = args.db
-        handler = {"crawl": _cmd_crawl, "filings": _cmd_filings, "extract": _cmd_extract, "export": _cmd_export,
+        handler = {"crawl": _cmd_crawl, "filings": _cmd_filings, "extract": _cmd_extract, "export": _cmd_export, "universe": _cmd_universe,
                    "serve": _cmd_serve}[args.command]
         return handler(args, settings)
     except ConfigError as exc:

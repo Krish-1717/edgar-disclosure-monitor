@@ -47,7 +47,7 @@
         <img src="assets/img/favicon.svg" alt="" width="28" height="28">
         <span class="hide-sm">EDGAR Monitor</span>
       </a>
-      <span class="demo-badge mono" title="All data on this page is illustrative">DEMO DATA</span>
+      <span class="demo-badge live-badge mono" title="Filing lists come live from SEC EDGAR; prices, scores and relationships marked illustrative are demo data">LIVE SEC DATA</span>
     </div>
     <div class="tb-context" id="tb-context" aria-live="polite">
       <span class="tb-hint">Add a ticker to grow the hive</span>
@@ -64,7 +64,7 @@
       <label for="ticker-search" class="sb-label">Watchlist</label>
       <div class="search-box" role="combobox" aria-haspopup="listbox" aria-owns="search-results" aria-expanded="false" id="search-combo">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M16 16l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <input id="ticker-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search ticker or company" aria-autocomplete="list" aria-controls="search-results">
+        <input id="ticker-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search any public company" aria-autocomplete="list" aria-controls="search-results">
       </div>
       <ul class="search-results" id="search-results" role="listbox" aria-label="Matching companies" hidden></ul>
     </div>
@@ -73,12 +73,15 @@
       <p>No companies yet. Try one:</p>
       <div class="quick" id="quick-add"></div>
     </div>
-    <p class="sb-foot">Prices, filings and links are illustrative. Not investment advice.<br>
+    <p class="sb-foot">Filings come live from SEC EDGAR for every listed company. Scores and relationships marked illustrative are demo data. Not investment advice.<br>
       <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <button type="button" data-cookie-settings>Cookie settings</button></p>
   </aside>
 
   <!-- ============ MAIN: CRAWLER + HIVE ============ -->
   <main class="main" id="main">
+    <nav class="view-tabs" aria-label="Open views">
+      <div class="vt-list" id="view-tabs" role="tablist" aria-label="Hive and company tabs"></div>
+    </nav>
     <section class="pipeline-strip" aria-label="Crawler pipeline">
       <ol id="pipeline">
         <li data-stage="discover"><b></b><span>Discover <small>EDGAR index &middot; CIK map</small></span></li>
@@ -94,7 +97,7 @@
     <section class="graph-area" id="graph-area" tabindex="-1" aria-label="Filing network. Each company is a cluster of filings grouped by category; shared shareholders, executives and deals connect clusters.">
       <svg id="hive" role="group" aria-label="Hive network graph"></svg>
       <section class="crawl-console glass" id="crawl-console" aria-label="Crawler console" hidden>
-        <header><span class="dot-live" aria-hidden="true"></span><span class="mono">oracle-crawler &middot; simulated</span><span class="mono cc-stats" id="cc-stats">idle</span>
+        <header><span class="dot-live" aria-hidden="true"></span><span class="mono" id="cc-title">oracle-crawler</span><span class="mono cc-stats" id="cc-stats">idle</span>
           <button type="button" class="icon-btn sm" id="console-close" aria-label="Close crawler console"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></header>
         <ol class="mono" id="crawl-console-log" aria-live="off"></ol>
       </section>
@@ -115,6 +118,21 @@
         </button>
       </div>
       <div class="legend glass" id="legend"></div>
+      <aside class="filings glass" id="filings" aria-label="Public filings" hidden>
+        <header class="fl-head">
+          <span class="fl-kicker mono" id="fl-kicker"></span>
+          <h2 id="fl-name">Company</h2>
+          <p class="fl-meta" id="fl-meta"></p>
+        </header>
+        <div class="fl-crawl" id="fl-crawl" aria-live="polite"><span class="fl-dot" aria-hidden="true"></span><span class="mono" id="fl-crawl-text">waiting</span><div class="fl-bar"><i id="fl-bar"></i></div></div>
+        <div class="fl-tools">
+          <label class="sr-only" for="fl-q">Filter filings</label>
+          <input type="search" id="fl-q" autocomplete="off" spellcheck="false" placeholder="Filter: form, item, year, words">
+          <div class="fl-cats" id="fl-cats" role="group" aria-label="Filter by category"></div>
+        </div>
+        <ol class="fl-list" id="fl-list" aria-label="Filings, newest first"></ol>
+        <footer class="fl-foot"><button type="button" class="btn btn-ghost btn-sm" id="fl-more">Load older filings</button><a class="mono" id="fl-edgar" target="_blank" rel="noopener" href="https://www.sec.gov/edgar/search/">EDGAR &rarr;</a></footer>
+      </aside>
       <div class="tooltip" id="tooltip" role="tooltip"></div>
     </section>
 

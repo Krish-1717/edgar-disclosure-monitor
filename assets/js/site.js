@@ -11,6 +11,7 @@ var WEB3FORMS_ACCESS_KEY = 'YOUR_WEB3FORMS_ACCESS_KEY'; // from https://web3form
   'use strict';
 
   var CONSENT_KEY = 'edm_consent_v1';
+  var JOINED_KEY = 'edm_waitlist_joined_v1';  // emails this browser already submitted (dedupe)
   var MIN_FILL_MS = 3000;
   var script = document.currentScript;
   var BASE = script ? script.src.replace(/assets\/js\/site\.js.*$/, '') : '';
@@ -213,6 +214,11 @@ var WEB3FORMS_ACCESS_KEY = 'YOUR_WEB3FORMS_ACCESS_KEY'; // from https://web3form
       setStatus('That was fast. Please wait a moment and try again.', 'err');
       return;
     }
+    var joined = store(JOINED_KEY) || [], emailKey = emailEl.value.trim().toLowerCase();
+    if (joined.indexOf(emailKey) >= 0) {
+      setStatus('You are already on the list with ' + emailEl.value.trim() + '. We will be in touch.', 'ok');
+      return;
+    }
     if (!WEB3FORMS_ACCESS_KEY || WEB3FORMS_ACCESS_KEY.indexOf('YOUR_') === 0) {
       setStatus('Waitlist is not connected yet (owner: add the Web3Forms access key in assets/js/site.js).', 'err');
       return;
@@ -229,12 +235,15 @@ var WEB3FORMS_ACCESS_KEY = 'YOUR_WEB3FORMS_ACCESS_KEY'; // from https://web3form
         from_name: 'EDGAR Disclosure Monitor',
         name: nameEl.value.trim(),
         email: emailEl.value.trim(),
+        replyto: emailEl.value.trim(),
+        page: location.pathname.split('/').pop() || 'index.html',
         botcheck: false
       })
     }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
         if (res.ok && res.j.success !== false) {
           setStatus('Thanks! You are on the list. Watch your inbox.', 'ok');
+          joined.push(emailKey); store(JOINED_KEY, joined.slice(-5));
           form.reset();
         } else {
           setStatus((res.j && res.j.message) || 'Something went wrong. Please try again.', 'err');
