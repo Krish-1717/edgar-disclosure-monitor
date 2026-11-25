@@ -97,8 +97,27 @@ TEN_Q_HTML = f"""<html><body>
 {_p("Share repurchases. " + LOREM)}
 </body></html>"""
 
-FORM4_XML = b"<?xml version='1.0'?><ownershipDocument><issuer><issuerCik>0001045810</issuerCik></issuer></ownershipDocument>"
+FORM4_XML = b"""<?xml version='1.0'?><ownershipDocument><periodOfReport>2025-02-28</periodOfReport>
+<issuer><issuerCik>0001045810</issuerCik></issuer>
+<reportingOwner><reportingOwnerId><rptOwnerName>Doe Jane</rptOwnerName></reportingOwnerId>
+<reportingOwnerRelationship><isDirector>0</isDirector><isOfficer>1</isOfficer><officerTitle>EVP, CFO</officerTitle></reportingOwnerRelationship></reportingOwner>
+<aff10b5One>1</aff10b5One>
+<nonDerivativeTable><nonDerivativeTransaction><securityTitle><value>Common Stock</value></securityTitle>
+<transactionDate><value>2025-02-27</value></transactionDate><transactionCoding><transactionCode>S</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>1,000</value></transactionShares><transactionPricePerShare><value>120.50</value></transactionPricePerShare>
+<transactionAcquiredDisposedCode><value>D</value></transactionAcquiredDisposedCode></transactionAmounts>
+<postTransactionAmounts><sharesOwnedFollowingTransaction><value>50000</value></sharesOwnedFollowingTransaction></postTransactionAmounts>
+<ownershipNature><directOrIndirectOwnership><value>D</value></directOrIndirectOwnership></ownershipNature></nonDerivativeTransaction></nonDerivativeTable>
+</ownershipDocument>"""
 EIGHT_K_HTML = b"<html><body><p>Item 5.02 Departure of Directors</p></body></html>"
+INDEX_HEADERS_8K = """<html><body><pre>
+<DOCUMENT><TYPE>8-K<SEQUENCE>1<FILENAME>nvda-8k.htm</DOCUMENT>
+<DOCUMENT><TYPE>EX-99.2<SEQUENCE>3<FILENAME>ex992.htm</DOCUMENT>
+<DOCUMENT><TYPE>EX-99.1<SEQUENCE>2<FILENAME>ex991.htm</DOCUMENT>
+</pre></body></html>"""
+EX991_HTML = b"""<html><body><p>NVIDIA Announces Financial Results for Fourth Quarter and Fiscal 2025 with record revenue across every market platform.</p>
+<p>Revenue for the fourth quarter was $39.3 billion, up 12% from the previous quarter and up 78% from a year ago, driven by Data Center demand.</p>
+<p>GAAP earnings per diluted share for the quarter were $0.89, up 14% from the previous quarter and up 82% from a year ago, the company said today.</p></body></html>"""
 
 
 def index_json(acc_nodash: str, name: str) -> dict:

@@ -80,6 +80,13 @@ CREATE TABLE IF NOT EXISTS sections (
     PRIMARY KEY (accession, key)
 );
 
+CREATE TABLE IF NOT EXISTS extras (
+    accession TEXT NOT NULL REFERENCES filings (accession),
+    kind      TEXT NOT NULL,
+    data      TEXT NOT NULL,
+    PRIMARY KEY (accession, kind)
+);
+
 CREATE TABLE IF NOT EXISTS crawl_runs (
     id            INTEGER PRIMARY KEY,
     started_at    TEXT NOT NULL,
@@ -240,6 +247,20 @@ class Store:
             [(accession, s["key"], s["item"], s["title"], s["text"], len(s["text"])) for s in sections],
         )
         self.conn.commit()
+
+    def save_extra(self, accession: str, kind: str, data: dict) -> None:
+        import json
+        self.conn.execute(
+            "INSERT INTO extras (accession, kind, data) VALUES (?, ?, ?) "
+            "ON CONFLICT (accession, kind) DO UPDATE SET data = excluded.data",
+            (accession, kind, json.dumps(data, separators=(",", ":"))),
+        )
+        self.conn.commit()
+
+    def extras_for(self, accession: str) -> dict:
+        import json
+        rows = self.conn.execute("SELECT kind, data FROM extras WHERE accession = ?", (accession,)).fetchall()
+        return {r[0]: json.loads(r[1]) for r in rows}
 
     def sections_for(self, accession: str, include_text: bool = False) -> list[dict]:
         cols = "key, item, title, char_count" + (", text" if include_text else "")

@@ -43,6 +43,11 @@ def _parser() -> argparse.ArgumentParser:
     u = sub.add_parser("universe", help="write every SEC-listed company (ticker, name, CIK, exchange) for site search")
     u.add_argument("--out", type=pathlib.Path, default=pathlib.Path("data/oracle/export/universe.json"))
 
+    a = sub.add_parser("summarize", help="write Claude Opus 5.5 analyses for new diffs (needs ANTHROPIC_API_KEY)")
+    a.add_argument("--out", type=pathlib.Path, default=pathlib.Path("assets/data/oracle"))
+    a.add_argument("--max-filings", type=int, default=10)
+    a.add_argument("--budget-usd", type=float, default=2.0, help="stop once this much has been spent in this run")
+
     s = sub.add_parser("serve", help="run the read API")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
@@ -124,6 +129,16 @@ def _cmd_universe(args, settings: Settings) -> int:
     return 0
 
 
+def _cmd_summarize(args, settings: Settings) -> int:
+    from .ai import run
+
+    rep = run(args.out, max_filings=args.max_filings, budget_usd=args.budget_usd)
+    print(f"AI analyses: {len(rep['written'])} written, {len(rep['skipped'])} skipped, ${rep['spent_usd']:.4f} spent ({rep['status']})")
+    for acc, why in rep["skipped"]:
+        print(f"  skipped {acc}: {why}")
+    return 0
+
+
 def _cmd_serve(args, settings: Settings) -> int:
     import uvicorn
 
@@ -142,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
         settings = Settings.from_env()
         if args.db:
             settings.db_path = args.db
-        handler = {"crawl": _cmd_crawl, "filings": _cmd_filings, "extract": _cmd_extract, "export": _cmd_export, "universe": _cmd_universe,
+        handler = {"crawl": _cmd_crawl, "filings": _cmd_filings, "extract": _cmd_extract, "export": _cmd_export, "universe": _cmd_universe, "summarize": _cmd_summarize,
                    "serve": _cmd_serve}[args.command]
         return handler(args, settings)
     except ConfigError as exc:

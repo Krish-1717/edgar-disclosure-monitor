@@ -8,7 +8,7 @@ import pathlib
 import re
 from dataclasses import dataclass, field
 
-from . import discovery, extract
+from . import discovery, extract, forms
 from .client import SecHttpError
 from .storage import Store
 
@@ -136,6 +136,30 @@ class Crawler:
             result.sections += len(sections)
             if not sections:
                 log.warning("%s %s: no sections found", ref.form, ref.accession)
+
+        if ref.base_form == "4" and ref.raw_primary_document.lower().endswith(".xml"):
+            parsed = forms.parse_form4(doc.content)
+            if parsed:
+                self.store.save_extra(ref.accession, "form4", parsed)
+
+        if ref.base_form == "8-K":
+            self._fetch_press_release(ref, result)
+
+    def _fetch_press_release(self, ref, result: TickerResult) -> None:
+        """8-K Exhibit 99.x (usually the press release): lead paragraphs and the numbers."""
+        headers_url = f"{ref.folder_url}/{ref.accession}-index-headers.html"
+        try:
+            name = forms.find_exhibit(self.client.get(headers_url).text, "EX-99")
+            if not name:
+                return
+            url = f"{ref.folder_url}/{name}"
+            ex = self.client.get(url)
+            self._store_document(ref, "ex99", url, ex.content, ex.headers.get("content-type"), result)
+            pr = forms.press_release(ex.content)
+            pr["url"] = url
+            self.store.save_extra(ref.accession, "ex99", pr)
+        except SecHttpError as exc:      # an exhibit we cannot read never fails the filing
+            log.warning("%s %s: no press release (%s)", ref.form, ref.accession, exc)
 
 
 def reextract(store: Store, ticker: str | None = None) -> list[tuple[str, str, int]]:

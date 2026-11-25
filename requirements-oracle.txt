@@ -6,6 +6,7 @@ lxml>=5.0
 python-dotenv>=1.0
 fastapi>=0.110
 uvicorn[standard]>=0.29
+anthropic>=2.14        # Opus 5.5 analyses in the scheduled job
 
 # tests
 pytest>=8.0

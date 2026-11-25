@@ -64,6 +64,9 @@ def mock_sec(router, extra=(), docs=None):
         router.get(f"{ARCH}/{nodash}/index.json").respond(json=fx.index_json(nodash, name))
         ctype = "text/xml" if name.endswith(".xml") else "text/html"
         router.get(f"{ARCH}/{nodash}/{name}").respond(content=docs[name], headers={"content-type": ctype})
+        if form.startswith("8-K"):
+            router.get(f"{ARCH}/{nodash}/{acc}-index-headers.html").respond(text=fx.INDEX_HEADERS_8K)
+            router.get(f"{ARCH}/{nodash}/ex991.htm").respond(content=fx.EX991_HTML, headers={"content-type": "text/html"})
 
 
 @pytest.fixture
@@ -273,8 +276,9 @@ def test_crawl_end_to_end_then_incremental_amendment(env):
     f4 = next(d for d in store.documents_for("0001045810-25-000040") if d["kind"] == "primary")
     assert f4["filename"] == "wk-form4_1.xml"
 
-    # Fair access: tickers + submissions + (index + doc) per filing, spaced >= 1/8 s apart.
-    assert client.request_count == 2 + 4 * 2
+    # Fair access: tickers + submissions + (index + doc) per filing + the 8-K's exhibit index and
+    # press release, spaced >= 1/8 s apart.
+    assert client.request_count == 2 + 4 * 2 + 2
     assert fc.now >= (client.request_count - 1) * 0.125 - 1e-9
 
     # Second run: nothing new, only discovery requests.
@@ -294,7 +298,7 @@ def test_crawl_end_to_end_then_incremental_amendment(env):
     assert amend["amends_accession"] == "0001045810-25-000023"
     adoc = next(d for d in store.documents_for(amend["accession"]) if d["kind"] == "primary")
     assert adoc["deduplicated"] == 1 and adoc["local_path"] == primary["local_path"]
-    assert len(list((tmp / "docs").rglob("*.htm"))) == 3   # 10-K, 8-K, 10-Q (10-K/A deduped)
+    assert len(list((tmp / "docs").rglob("*.htm"))) == 4   # 10-K, 8-K + its press release, 10-Q (10-K/A deduped)
     run = store.last_run()
     assert run["new_filings"] == 1 and run["amendments"] == 1
 
@@ -430,6 +434,14 @@ def test_export_feed_matches_site_schema(env):
     assert mdna["change"]["paragraphs_added"] == 0
     assert {f["group"] for f in feed["filings"]} == {"quarterly", "annual", "event", "insider"}
     assert json.loads((out / "index.json").read_text())["companies"][0]["feed"] == "companies/NVDA.json"
+    # side-by-side diff file for the compared 10-Q; Form 4 transactions inside the feed
+    d = json.loads((out / f0["diff"]).read_text())
+    assert d["compared_to"] == "0001045810-25-000090"
+    rf = next(x for x in d["sections"] if x["key"] == "risk_factors")
+    assert rf["counts"]["added"] >= 1 and any(e["t"] == "added" and "Tariffs" in e["text"] for e in rf["entries"])
+    assert [x["key"] for x in d["sections"]][0] == "risk_factors"
+    f4 = next(f for f in feed["filings"] if f["base_form"] == "4")
+    assert f4["form4"]["transactions"][0]["value"] == 120500.0
 
     from fastapi.testclient import TestClient
     from oracle.api import create_app
@@ -456,6 +468,118 @@ def test_universe_file(tmp_path):
     raw = (tmp_path / "u.json").read_bytes()
     raw.decode("ascii")
     assert json.loads(raw)["count"] == 4
+
+
+# -- form-specific extraction and aligned diffs -------------------------------------
+def test_form4_parsed_into_transactions(env):
+    from oracle import forms
+    f4 = forms.parse_form4(fx.FORM4_XML)
+    assert f4["owners"] == [{"name": "Doe Jane", "roles": ["EVP, CFO"]}]
+    tx = f4["transactions"][0]
+    assert (tx["code"], tx["what"], tx["shares"], tx["price"], tx["value"], tx["ad"]) == ("S", "Open-market sale", 1000.0, 120.5, 120500.0, "D")
+    assert f4["plan_10b5_1"] is True
+    assert forms.parse_form4(b"not xml") is None
+
+
+def test_press_release_exhibit():
+    from oracle import forms
+    assert forms.find_exhibit(fx.INDEX_HEADERS_8K) == "ex991.htm"          # 99.1 before 99.2
+    escaped = fx.INDEX_HEADERS_8K.replace("<DOCUMENT>", "&lt;DOCUMENT&gt;").replace("</DOCUMENT>", "&lt;/DOCUMENT&gt;") \
+        .replace("<TYPE>", "&lt;TYPE&gt;").replace("<FILENAME>", "&lt;FILENAME&gt;")
+    assert forms.find_exhibit(escaped) == "ex991.htm"                    # the real SEC page escapes its tags
+    assert forms.find_exhibit("<DOCUMENT><TYPE>8-K<FILENAME>a.htm</DOCUMENT>") is None
+    pr = forms.press_release(fx.EX991_HTML)
+    assert pr["lead"].startswith("NVIDIA Announces")
+    assert any("$39.3 billion" in h for h in pr["highlights"])
+    assert any("$0.89" in h for h in pr["highlights"])
+
+
+def test_crawl_stores_form4_and_press_release(env):
+    crawler, store, *_ = env
+    with respx.mock(assert_all_called=False) as router:
+        mock_sec(router)
+        crawler.crawl(["NVDA"], ["8-K", "4"])
+    assert store.extras_for("0001045810-25-000040")["form4"]["transactions"][0]["code"] == "S"
+    ex = store.extras_for("0001045810-25-000050")["ex99"]
+    assert ex["url"].endswith("/ex991.htm") and ex["highlights"]
+
+
+def test_aligned_diff_keeps_order_and_marks_changes():
+    from oracle.diffs import align_section, summarize, word_ops
+    a = "Alpha paragraph about our supply chain and the outside foundries we rely on for wafers and advanced packaging.\n\n" \
+        "Beta paragraph about our largest customers, which are concentrated in a handful of hyperscale cloud buyers today.\n\n" \
+        "Gamma paragraph about a lawsuit that was settled in the prior year and is now closed."
+    b = "Alpha paragraph about our supply chain and the outside foundries we rely on for wafers and advanced packaging.\n\n" \
+        "Beta paragraph about our largest customers, which are concentrated in a few hyperscale cloud and sovereign buyers today.\n\n" \
+        "Delta paragraph about new export licenses that now allow limited shipments to selected customers in China this year."
+    e = align_section(a, b)
+    assert [x["t"] for x in e] == ["same", "changed", "removed", "added"]
+    assert summarize(e) == {"same": 1, "changed": 1, "added": 1, "removed": 1}
+    ch = e[1]
+    assert ch["before"].startswith("Beta") and ch["after"].startswith("Beta")
+    assert ["-", "handful of"] in [[o, t.strip()] for o, t in ch["ops"]] and ["+", "and sovereign"] in [[o, t.strip()] for o, t in ch["ops"]]
+    assert word_ops("a b c", "a x c") == [["=", "a "], ["-", "b"], ["+", "x"], ["=", " c"]]
+
+
+def test_ai_summaries_mocked_and_capped(env, monkeypatch):
+    import anthropic
+    from oracle import ai
+    from oracle.export import write_export
+
+    crawler, store, _, _, tmp = env
+    later_q = ("0001045810-25-000120", "10-Q", "2025-08-27", "2025-07-27", "nvda-20250727.htm", "")
+    changed = fx.TEN_Q_HTML.replace("QRISK-BODY Export controls may restrict sales.",
+                                    "QRISK-BODY Export controls may restrict sales. New tariffs on imported components "
+                                    "rose sharply this quarter and could reduce our gross margin materially.</p><p>" + fx.LOREM)
+    docs = {"nvda-20250126.htm": fx.TEN_K_HTML.encode(), "nvda-20250126a.htm": fx.TEN_K_HTML.encode(),
+            "wk-form4_1.xml": fx.FORM4_XML, "nvda-8k.htm": fx.EIGHT_K_HTML,
+            "nvda-20250427.htm": fx.TEN_Q_HTML.encode(), "nvda-20250727.htm": changed.encode()}
+    with respx.mock(assert_all_called=False) as router:
+        mock_sec(router, extra=[later_q], docs=docs)
+        crawler.crawl(["NVDA"], ["10-Q"])
+    out = tmp / "export"
+    write_export(store, out)
+
+    prompt = ai.build_prompt(json.loads((out / "diffs" / "0001045810-25-000120.json").read_text()), "NVIDIA CORP")
+    assert "risk_factors#" in prompt and "New tariffs" in prompt and "QMKT-BODY" not in prompt   # unchanged text left out
+
+    answer = {"headline": "New tariff risk added", "summary": "Risk factors add tariffs.", "tone": "No clear shift.", "watch": [],
+              "key_changes": [{"cite": "risk_factors#1", "kind": "added", "title": "Tariff exposure on components", "why_it_matters": "Margins."}]}
+    from types import SimpleNamespace as NS
+
+    class FakeClient:       # in-process stand-in for anthropic.Anthropic: never touches the network
+        def __init__(self, text):
+            self.calls, self.text = [], text
+            self.beta = NS(messages=NS(create=self._create))
+
+        def _create(self, **kw):
+            self.calls.append(kw)
+            return NS(model="claude-opus-5-5", stop_reason="end_turn", content=[NS(type="text", text=self.text)],
+                      usage=NS(input_tokens=10000, output_tokens=500))
+
+    fake = FakeClient(json.dumps(answer))
+    rep = ai.run(out, client=fake, budget_usd=5)
+    sent = fake.calls[0]
+    assert sent["model"] == "claude-opus-5-5" and sent["output_config"]["effort"] == "medium" and sent["fallbacks"] == "default"
+    assert sent["output_config"]["format"]["type"] == "json_schema" and sent["betas"] == ["server-side-fallback-2026-07-01"]
+    assert rep["written"] == ["0001045810-25-000120"] and rep["spent_usd"] == round(10000 * 4e-6 + 500 * 20e-6, 4)
+    saved = json.loads((out / "ai" / "0001045810-25-000120.json").read_text())
+    assert saved["headline"] == "New tariff risk added" and saved["model"] == "claude-opus-5-5"
+    # already analysed: nothing to do, nothing spent
+    again = FakeClient("{}")
+    assert ai.run(out, client=again)["written"] == [] and again.calls == []
+    # a budget of zero stops before any call
+    (out / "ai" / "0001045810-25-000120.json").unlink()
+    capped = FakeClient(json.dumps(answer))
+    assert "budget" in ai.run(out, client=capped, budget_usd=0)["status"] and capped.calls == []
+    ai.run(out, client=FakeClient(json.dumps(answer)), budget_usd=5)
+    # no key: skipped cleanly
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert "skipped" in ai.run(out)["status"]
+    # the feed points at the analysis after the next export
+    write_export(store, out)
+    feed = json.loads((out / "companies" / "NVDA.json").read_text())
+    assert next(f for f in feed["filings"] if f["accession"] == "0001045810-25-000120")["ai"] == "ai/0001045810-25-000120.json"
 
 
 # -- CLI ------------------------------------------------------------------------

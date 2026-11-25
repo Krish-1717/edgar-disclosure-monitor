@@ -187,7 +187,9 @@ def build_company_feed(store: Store, ticker: str, limit: int = 100) -> dict | No
             "sha256": r["sha256"],
             "index_url": r["index_url"].replace("index.json", f"{r['accession']}-index.htm") if r["index_url"] else None,
             "compared_to": prev["accession"] if prev else None,
+            "diff": f"diffs/{r['accession']}.json" if prev and secs else None,
             "sections": sections,
+            **store.extras_for(r["accession"]),       # form4 / ex99 when parsed
         })
     for f in filings:   # most recent annual/quarterly report is the "current" one, as in the demo
         if f["group"] in ("annual", "quarterly") and f["status"] == "fetched":
@@ -234,8 +236,51 @@ def write_universe(client, out_path: str | pathlib.Path) -> dict:
     universe = build_universe(data["data"])
     path = pathlib.Path(out_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(universe, ensure_ascii=True, separators=(",", ":")), encoding="ascii")
+    write_json(path, universe)
     return universe
+
+
+SECTION_ORDER = ["risk_factors", "mdna", "market_risk", "financial_statements"]
+VOLATILE = ("generated_at", "last_crawled_at")
+
+
+def _strip(obj):
+    if isinstance(obj, dict):
+        return {k: _strip(v) for k, v in obj.items() if k not in VOLATILE}
+    if isinstance(obj, list):
+        return [_strip(v) for v in obj]
+    return obj
+
+
+def write_json(path: pathlib.Path, obj, indent=None) -> bool:
+    """Write only when the content changed (timestamps aside), so scheduled runs don't churn git."""
+    if path.exists():
+        try:
+            if _strip(json.loads(path.read_text())) == _strip(obj):
+                return False
+        except (ValueError, OSError):
+            pass
+    path.write_text(json.dumps(obj, ensure_ascii=True, indent=indent, separators=None if indent else (",", ":")), encoding="ascii")
+    return True
+
+
+def build_diff(store: Store, accession: str, prev_accession: str) -> dict:
+    """Full aligned diff of one filing against the previous one, for the side-by-side reader."""
+    from .diffs import align_section, summarize
+
+    cur = {s["key"]: s for s in store.sections_for(accession, include_text=True)}
+    prev = {s["key"]: s for s in store.sections_for(prev_accession, include_text=True)}
+    f, pf = store.get_filing(accession), store.get_filing(prev_accession)
+    sections = []
+    for key in sorted(cur, key=lambda k: SECTION_ORDER.index(k) if k in SECTION_ORDER else 9):
+        if key not in prev:
+            continue
+        entries = align_section(prev[key]["text"], cur[key]["text"])
+        sections.append({"key": key, "item": cur[key]["item"], "title": cur[key]["title"],
+                         "counts": summarize(entries), "entries": entries})
+    return {"schema": FEED_SCHEMA, "accession": accession, "form": f["form"], "filing_date": f["filing_date"],
+            "compared_to": prev_accession, "prev_filing_date": pf["filing_date"] if pf else None,
+            "prev_url": pf["primary_doc_url"] if pf else None, "url": f["primary_doc_url"], "sections": sections}
 
 
 def write_export(store: Store, out_dir: str | pathlib.Path, tickers: list[str] | None = None) -> dict:
@@ -247,8 +292,15 @@ def write_export(store: Store, out_dir: str | pathlib.Path, tickers: list[str] |
         feed = build_company_feed(store, t)
         if not feed:
             continue
+        (out / "diffs").mkdir(exist_ok=True)
+        for f in feed["filings"]:
+            if f.get("diff"):
+                d = build_diff(store, f["accession"], f["compared_to"])
+                write_json(out / f["diff"], d)
+            if (out / "ai" / f"{f['accession']}.json").exists():
+                f["ai"] = f"ai/{f['accession']}.json"
         path = out / "companies" / f"{feed['company']['ticker']}.json"
-        path.write_text(json.dumps(feed, ensure_ascii=True, separators=(",", ":")), encoding="ascii")
+        write_json(path, feed)
         latest = feed["filings"][0] if feed["filings"] else None
         manifest["companies"].append({
             **feed["company"],
@@ -256,5 +308,5 @@ def write_export(store: Store, out_dir: str | pathlib.Path, tickers: list[str] |
             "latest": {k: latest[k] for k in ("form", "filing_date", "accession")} if latest else None,
             "feed": f"companies/{path.name}",
         })
-    (out / "index.json").write_text(json.dumps(manifest, ensure_ascii=True, indent=1), encoding="ascii")
+    write_json(out / "index.json", manifest, indent=1)
     return manifest
