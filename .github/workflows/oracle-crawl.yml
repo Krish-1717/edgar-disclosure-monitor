@@ -54,15 +54,19 @@ jobs:
           restore-keys: oracle-db-
 
       - name: Check secrets
+        id: secrets
         env:
           ORACLE_USER_AGENT: ${{ secrets.ORACLE_USER_AGENT }}
         run: |
           if [ -z "$ORACLE_USER_AGENT" ]; then
-            echo "::error::Add the ORACLE_USER_AGENT repository secret (SEC requires a User-Agent with a contact email)."
-            exit 1
+            echo "::warning::Skipping: add the ORACLE_USER_AGENT repository secret (SEC requires a User-Agent with a contact email)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Crawl new filings
+        if: steps.secrets.outputs.ready == 'true'
         env:
           ORACLE_USER_AGENT: ${{ secrets.ORACLE_USER_AGENT }}
         run: |
@@ -72,6 +76,7 @@ jobs:
           python -m oracle crawl $TICKERS --forms 4 --limit 3 || true
 
       - name: Export feeds and diffs
+        if: steps.secrets.outputs.ready == 'true'
         env:
           ORACLE_USER_AGENT: ${{ secrets.ORACLE_USER_AGENT }}
         run: |
@@ -79,6 +84,7 @@ jobs:
           python -m oracle universe --out $OUT/universe.json
 
       - name: Claude Opus 5.5 analyses (capped)
+        if: steps.secrets.outputs.ready == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
@@ -86,6 +92,7 @@ jobs:
           python -m oracle export $TICKERS --out $OUT
 
       - name: Commit changed data
+        if: steps.secrets.outputs.ready == 'true'
         run: |
           if [ -z "$(git status --porcelain -- $OUT)" ]; then
             echo "No new data."
@@ -99,7 +106,7 @@ jobs:
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Save crawl database
-        if: always()
+        if: always() && steps.secrets.outputs.ready == 'true'
         uses: actions/cache/save@v4
         with:
           path: data/oracle/oracle.db
