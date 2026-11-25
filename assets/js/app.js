@@ -78,7 +78,7 @@
     guidance: function (t) { return 'I found 4 instances where guidance language changed materially in ' + t + '\'s most recent filing. The most significant: "expect revenues to remain consistent" was replaced with "anticipate significant revenue growth" in Item 7. Additionally, the capex guidance range was tightened. These hedging-language shifts often precede earnings surprises.'; },
     insider: function (t, n) { return t + ' has ' + n + ' insider filings (Forms 4 and 144) in the demo set. Most are routine sales under pre-arranged 10b5-1 plans; one officer sale is larger than that officer\'s trailing 12-month average, which the forensic agent flags for context, not as a signal on its own.'; },
     diff: function (t, d) { return 'Versus the prior filing, ' + t + ' shows ' + d.length + ' material passage changes: ' + d.filter(function (x) { return x.type === 'added'; }).length + ' added, ' + d.filter(function (x) { return x.type === 'changed'; }).length + ' changed and ' + d.filter(function (x) { return x.type === 'removed'; }).length + ' removed. The headline: ' + d[0].text + ' Open the Changes tab to read each before/after pair.'; },
-    default: function (t) { return 'Looking across ' + t + '\'s recent SEC filings, I can see several material changes. The most significant is a shift in hedging language in Item 7 and new disclosures in the risk factors section. Materiality score: 78/100 (HIGH). Want me to drill into specific sections \u2014 MD&A, Risk Factors, or Financial Statements?'; }
+    default: function (t) { return 'Looking across ' + t + '\'s recent SEC filings, I can see several material changes. The most significant is a shift in hedging language in Item 7 and new disclosures in the risk factors section. Change score: 78/100 (HIGH). Want me to drill into specific sections \u2014 MD&A, Risk Factors, or Financial Statements?'; }
   };
 
   /* =====================================================================
@@ -225,7 +225,8 @@
         id: label + x.id.slice(x.form.length), form: code, date: x.date, cat: fi.cat, group: fi.cat, current: !!x.current,
         materiality: +Math.min(0.99, mat).toFixed(2), burial: +(0.1 + r() * 0.45).toFixed(2), gap: +(0.1 + r() * 0.5).toFixed(2),
         live: true, measured: w > 0, accession: x.accession, sec_url: x.sec_url, index_url: x.index_url, sha256: x.sha256, version: x.version,
-        is_amendment: x.is_amendment, amends: x.amends_accession, compared_to: x.compared_to, items: x.items || [], sections: x.sections || []
+        is_amendment: x.is_amendment, amends: x.amends_accession, compared_to: x.compared_to, items: x.items || [], sections: x.sections || [],
+        diff: x.diff || null, ai: x.ai || null, form4: x.form4 || null, ex99: x.ex99 || null
       };
     });
   }
@@ -770,7 +771,7 @@
     var s = SEC[t], info = TICKER_DB[t], list = $('fl-list');
     if (resetFilter) { flCat = 'all'; flQuery = ''; $('fl-q').value = ''; list.scrollTop = 0; }
     $('fl-kicker').textContent = info.fictional ? 'FICTIONAL DEMO FILER' : 'CIK ' + pad10(info.cik) + ' \u00b7 ' + (info.exchange || (s && s.meta && s.meta.exchanges[0]) || 'SEC registrant');
-    $('fl-name').textContent = (s && s.meta && s.meta.name) ? titleCase(s.meta.name) : info.name;
+    $('fl-name').textContent = info.universe && s && s.meta && s.meta.name ? titleCase(s.meta.name) : info.name;
     $('fl-edgar').href = edgarUrl(t, '') || 'https://www.sec.gov/edgar/search/';
     if (info.fictional) {
       $('fl-meta').textContent = 'Illustrative company. Its filings live in the hive; real companies list their full SEC history here.';
@@ -1000,7 +1001,23 @@
    * bands and tickers run alphabetically. Hover shows the company; click opens its tab. */
   var shellCanvas = $('hive-shell'), shellCtx = shellCanvas && shellCanvas.getContext ? shellCanvas.getContext('2d') : null;
   var SHELL = null, shellHover = -1, DPR = Math.min(2, window.devicePixelRatio || 1);
-  var EX_RGB = { NYSE: '150,163,230', Nasdaq: '120,190,210', CBOE: '200,180,140', TXSE: '200,160,190', OTC: '110,116,134' };
+  var EX_DARK = { NYSE: '150,163,230', Nasdaq: '120,190,210', CBOE: '200,180,140', TXSE: '200,160,190', OTC: '110,116,134' };
+  var EX_LIGHT = { NYSE: '66,86,214', Nasdaq: '15,127,148', CBOE: '154,106,12', TXSE: '184,67,126', OTC: '110,116,134' };
+  var EX_RGB = EX_DARK, SHELL_INK = '238,241,255', SHELL_WIRE = '103,232,249';
+  function isLight() {
+    var t = document.documentElement.getAttribute('data-theme');
+    return t ? t === 'light' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
+  }
+  function applyThemePalette() {
+    var light = isLight();
+    EX_RGB = light ? EX_LIGHT : EX_DARK;
+    SHELL_INK = light ? '20,22,27' : '238,241,255';
+    SHELL_WIRE = light ? '15,127,148' : '103,232,249';
+    if (typeof kick === 'function') kick();
+  }
+  applyThemePalette();
+  window.addEventListener('edm-theme', applyThemePalette);
+  if (window.matchMedia) { try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyThemePalette); } catch (e) {} }
   function buildShell() {
     if (!universeRows.length || (SHELL && SHELL.n === universeRows.length)) return;
     var n = universeRows.length, pts = spiral(n), ranges = [], i;
@@ -1056,17 +1073,17 @@
       if (k < 0 || SHELL.d[k] < 0) return;
       var on = !cam.focus || cam.focus === t;
       if (hub && hub.sx != null && !hub.behind) {
-        shellCtx.strokeStyle = 'rgba(103,232,249,' + ((on ? 0.38 : 0.12) * (0.4 + 0.6 * SHELL.d[k])).toFixed(3) + ')';
+        shellCtx.strokeStyle = 'rgba(' + SHELL_WIRE + ',' + ((on ? 0.38 : 0.12) * (0.4 + 0.6 * SHELL.d[k])).toFixed(3) + ')';
         shellCtx.lineWidth = 1;
         shellCtx.setLineDash([3, 5]);
         shellCtx.beginPath(); shellCtx.moveTo(SHELL.sx[k], SHELL.sy[k]); shellCtx.lineTo(hub.sx, hub.sy); shellCtx.stroke();
         shellCtx.setLineDash([]);
       }
-      shellCtx.fillStyle = 'rgba(238,241,255,' + ((on ? 0.95 : 0.4) * (0.35 + 0.65 * SHELL.d[k])).toFixed(3) + ')';
+      shellCtx.fillStyle = 'rgba(' + SHELL_INK + ',' + ((on ? 0.95 : 0.4) * (0.35 + 0.65 * SHELL.d[k])).toFixed(3) + ')';
       shellCtx.beginPath(); shellCtx.arc(SHELL.sx[k], SHELL.sy[k], 2.6 * sk, 0, Math.PI * 2); shellCtx.fill();
     });
     if (shellHover >= 0 && SHELL.d[shellHover] >= 0) {
-      shellCtx.strokeStyle = 'rgba(238,241,255,0.95)'; shellCtx.lineWidth = 1.5;
+      shellCtx.strokeStyle = 'rgba(' + SHELL_INK + ',0.95)'; shellCtx.lineWidth = 1.5;
       shellCtx.beginPath(); shellCtx.arc(SHELL.sx[shellHover], SHELL.sy[shellHover], 6, 0, Math.PI * 2); shellCtx.stroke();
     }
   }
@@ -1275,7 +1292,7 @@
     var normal = gLinksData.filter(function (l) { return l.kind !== 'shared'; });
     var shared = gLinksData.filter(function (l) { return l.kind === 'shared'; });
     gLinks.selectAll('line').data(normal, function (d) { return d.id; }).join(
-      function (en) { return en.append('line').attr('stroke', function (d) { return d.kind === 'hc' ? 'rgba(168,180,255,0.5)' : CATEGORIES[d.cat].color; })
+      function (en) { return en.append('line').attr('class', function (d) { return d.kind === 'hc' ? 'hc' : null; }).attr('stroke', function (d) { return d.kind === 'hc' ? null : CATEGORIES[d.cat].color; })
         .attr('stroke-width', function (d) { return d.kind === 'hc' ? 1.1 : 0.7; }); },
       function (up) { return up; },
       function (ex) { return ex.remove(); });
@@ -1293,8 +1310,8 @@
       var g = d3.select(this).select('.inner');
       if (d.kind === 'hub') {
         g.append('circle').attr('class', 'halo').attr('r', 46).attr('fill', 'url(#hub-halo)');
-        g.append('circle').attr('r', 22).attr('fill', '#0b0e1f').attr('stroke', '#c9ceff').attr('stroke-width', 1.6).attr('filter', 'url(#soft-glow)');
-        g.append('text').text(d.label).attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', d.label.length > 4 ? 9 : 11).attr('font-weight', 600).attr('fill', '#eef1f8').attr('font-family', 'Geist Mono, monospace');
+        g.append('circle').attr('class', 'hub-core').attr('r', 22).attr('stroke-width', 1.6).attr('filter', 'url(#soft-glow)');
+        g.append('text').attr('class', 'hub-label').text(d.label).attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', d.label.length > 4 ? 9 : 11).attr('font-weight', 600).attr('font-family', 'Geist Mono, monospace');
         g.append('circle').attr('class', 'focus-ring').attr('r', 27);
       } else if (d.kind === 'cat') {
         g.append('circle').attr('r', 4).attr('fill', CATEGORIES[d.cat].color).attr('opacity', 0.9);
@@ -1307,7 +1324,7 @@
         else if (d.tier === 2) g.append('circle').attr('r', 9).attr('fill', 'none').attr('stroke', c).attr('stroke-opacity', 0.55).attr('stroke-width', 0.9);
         if (d.filing.live) g.append('circle').attr('r', 15).attr('fill', 'none').attr('stroke', '#67e8f9').attr('stroke-opacity', 0.7).attr('stroke-width', 1).attr('stroke-dasharray', '2 3');
         g.append('circle').attr('class', 'core').attr('r', nodeR(d)).attr('fill', c).attr('fill-opacity', d.tier === 1 ? 0.95 : d.tier === 2 ? 0.85 : 0.65);
-        if (d.tier === 1) g.append('text').text(d.filing.form.replace('Form ', 'F')).attr('text-anchor', 'middle').attr('dy', 23).attr('font-size', 8.5).attr('fill', '#98a2c4');
+        if (d.tier === 1) g.append('text').attr('class', 'tier-label').text(d.filing.form.replace('Form ', 'F')).attr('text-anchor', 'middle').attr('dy', 23).attr('font-size', 8.5);
         g.append('circle').attr('class', 'focus-ring').attr('r', d.tier === 1 ? 16 : 11);
       }
     });
@@ -1457,13 +1474,13 @@
 
   function highlightCluster(t) {
     if (!hasD3 || !gNodes) return;
-    gNodes.selectAll('g.n-hub').select('circle:nth-child(2)').attr('stroke-width', function (d) { return d.ticker === t ? 2.6 : 1.6; }).attr('stroke', function (d) { return d.ticker === t ? '#eef0ff' : '#c9ceff'; });
+    gNodes.selectAll('g.n-hub').select('circle:nth-child(2)').attr('stroke-width', function (d) { return d.ticker === t ? 2.6 : 1.6; }).attr('stroke', null).style('stroke', function (d) { return d.ticker === t ? 'var(--text)' : null; });
   }
 
   function ariaFor(d) {
     if (d.kind === 'hub') return d.ticker + ', ' + TICKER_DB[d.ticker].name + '. Press Enter to open its tab.';
     if (d.kind === 'entity') return ENTITY_TYPES[d.etype].label + ': ' + d.label + ', links ' + d.tickers.join(', ');
-    return d.ticker + ' ' + d.filing.id + ', ' + CATEGORIES[d.cat].label + ', filed ' + d.filing.date + ', materiality ' + Math.round(d.filing.materiality * 100) + '. Press Enter to analyze.';
+    return d.ticker + ' ' + d.filing.id + ', ' + CATEGORIES[d.cat].label + ', filed ' + d.filing.date + ', change score ' + Math.round(d.filing.materiality * 100) + '. Press Enter to analyze.';
   }
   function activate(d) {
     if (d.kind === 'hub') { openTab(d.ticker); return; }
@@ -1474,7 +1491,7 @@
     var html;
     if (d.kind === 'hub') { var s = TICKER_DB[d.ticker], sc = SEC[d.ticker]; html = '<b>' + d.ticker + '</b> \u00b7 ' + esc(s.name) + '<br>' + (sc && sc.status === 'ok' ? sc.filings.length.toLocaleString() + ' SEC filings' : getFilings(d.ticker).length + ' filings') + (s.sector ? ' \u00b7 ' + esc(s.sector) : '') + '<br><span style="color:#949db2">Click to open its tab</span>'; }
     else if (d.kind === 'entity') html = '<b>' + esc(d.label) + '</b><br>' + esc(ENTITY_TYPES[d.etype].label) + ' \u00b7 ' + d.tickers.join(', ') + '<br><span style="color:#949db2">' + esc(d.note) + ' (illustrative)</span>';
-    else html = '<b>' + esc(d.filing.id) + '</b>' + (d.tier ? ' \u00b7 Tier ' + d.tier : '') + '<br>' + esc(formInfo(d.filing.form).name) + ' \u00b7 ' + esc(CATEGORIES[d.cat].label) + '<br>Filed ' + esc(d.filing.date) + ' \u00b7 Materiality ' + Math.round(d.filing.materiality * 100);
+    else html = '<b>' + esc(d.filing.id) + '</b>' + (d.tier ? ' \u00b7 Tier ' + d.tier : '') + '<br>' + esc(formInfo(d.filing.form).name) + ' \u00b7 ' + esc(CATEGORIES[d.cat].label) + '<br>Filed ' + esc(d.filing.date) + ' \u00b7 Change score ' + Math.round(d.filing.materiality * 100);
     tooltip.innerHTML = html;
     tooltip.classList.add('visible');
     if (ev.type === 'focus') {
@@ -1634,7 +1651,8 @@
   }
   function closePanel() {
     panelToken++;
-    panel.classList.remove('open');
+    readerState = null;
+    panel.classList.remove('open', 'wide');
     panel.setAttribute('aria-hidden', 'true');
     activeFiling = null;
     if (!cam.userZoom) cam.tz = targetZoom();
@@ -1656,6 +1674,8 @@
     if (!activeFiling) return;
     var f = activeFiling.filing, t = activeFiling.ticker;
     panelToken++;
+    readerState = null;
+    panel.classList.remove('wide');
     if (name === 'crawler') renderCrawler(f, t);
     else if (name === 'diff') renderDiff(f, t);
     else renderScore(f, t);
@@ -1701,7 +1721,7 @@
         ['l-info', '> Corporate intel: ' + (2 + Math.floor(r() * 5)) + ' linked executives, holders or deals'],
         ['l-info', '> External research: cross-checked ' + (1 + Math.floor(r() * 4)) + ' outside sources']] },
       { key: 'report', label: 'Cited report', chips: ['Summary', 'Changes', 'Risks', 'Capital structure', 'Citations'], lines: [
-        ['l-warn', '> Materiality ' + Math.round(f.materiality * 100) + '/100 \u00b7 ' + (f.materiality >= 0.7 ? 'HIGH' : f.materiality >= 0.5 ? 'MEDIUM' : 'LOW')],
+        ['l-warn', '> Change score ' + Math.round(f.materiality * 100) + '/100 \u00b7 ' + (f.materiality >= 0.7 ? 'HIGH' : f.materiality >= 0.5 ? 'MEDIUM' : 'LOW')],
         ['l-ok', '> \u2713 Report ready \u00b7 every finding cites filing, period and page']] }
     ];
     if (f.live) {   // real ORACLE crawl: report what v0 actually did, not the simulated extras
@@ -1757,7 +1777,7 @@
       '<div class="log" id="crawl-log" role="log" aria-label="Crawler log"></div>' +
       '<div class="report-card" id="report-card"><h3>Cited summary</h3><p>' + esc(diffs[0].text) + '</p>' +
       '<div class="cites">' + diffs.slice(0, 3).map(function (d, i) { return '<button type="button" class="cite" data-goto="diff">[' + (i + 1) + '] ' + esc(d.section) + '</button>'; }).join('') + '</div>' +
-      '<div class="stats"><div class="stat"><b class="' + (f.real && !f.measured ? 'c-accent' : matClass(f.materiality)) + '">' + (f.real && !f.measured ? '\u2013' : Math.round(f.materiality * 100)) + '</b><span>Materiality</span></div>' +
+      '<div class="stats"><div class="stat"><b class="' + (f.real && !f.measured ? 'c-accent' : matClass(f.materiality)) + '">' + (f.real && !f.measured ? '\u2013' : Math.round(f.materiality * 100)) + '</b><span>Change score</span></div>' +
       '<div class="stat"><b class="c-amber">' + diffs.length + '</b><span>Changes</span></div>' +
       (f.live ? '<div class="stat"><b class="c-accent">' + f.sections.length + '</b><span>Sections</span></div></div>'
         : f.real ? '<div class="stat"><b class="c-accent">' + (f.row && f.row.size ? fmtKB(f.row.size) : '\u2013') + '</b><span>Document</span></div></div>'
@@ -1767,7 +1787,7 @@
       (f.real && !f.live
         ? '<p class="panel-foot"><span class="live-tag">SEC EDGAR</span> <a href="' + esc(f.sec_url) + '" target="_blank" rel="noopener">Open the document</a> \u00b7 <a href="' + esc(f.index_url) + '" target="_blank" rel="noopener">filing index</a> \u00b7 Listed live from SEC EDGAR. Not deep-parsed by ORACLE yet, so there are no section changes or scores for it.</p>'
         : f.live
-        ? '<p class="panel-foot"><span class="live-tag">Real SEC filing</span> <a href="' + esc(f.index_url || f.sec_url) + '" target="_blank" rel="noopener">Open ' + esc(f.accession) + ' on SEC EDGAR</a> \u00b7 Crawled by ORACLE. ' + (f.measured ? 'Materiality here is the measured share of changed paragraphs; burial and attention gap are illustrative.' : 'No earlier version to compare, so the scores are placeholders.') + '</p>'
+        ? '<p class="panel-foot"><span class="live-tag">Real SEC filing</span> <a href="' + esc(f.index_url || f.sec_url) + '" target="_blank" rel="noopener">Open ' + esc(f.accession) + ' on SEC EDGAR</a> \u00b7 Crawled by ORACLE. ' + (f.measured ? 'The change score is the measured share of changed paragraphs; burial and attention gap are illustrative.' : 'No earlier version to compare, so the scores are placeholders.') + '</p>'
         : '<p class="panel-foot">' + (url ? '<a href="' + url + '" target="_blank" rel="noopener">View ' + esc(t) + ' ' + esc(f.form) + ' filings on SEC EDGAR</a> \u00b7 ' : 'Fictional demo company: no EDGAR record. ') + 'Demo analysis is illustrative.</p>');
     var log = $('crawl-log'), items = panelBody.querySelectorAll('.stage'), seq = [];
     stages.forEach(function (s, i) {
@@ -1793,7 +1813,7 @@
     var g = e.target.closest('[data-goto]');
     if (g) { setTab(g.getAttribute('data-goto')); return; }
     var chip = e.target.closest('[data-filter]');
-    if (chip && activeFiling) { diffFilter = chip.getAttribute('data-filter'); renderDiff(activeFiling.filing, activeFiling.ticker); var c2 = panelBody.querySelector('[data-filter="' + diffFilter + '"]'); if (c2) c2.focus(); return; }
+    if (chip && activeFiling) { diffFilter = chip.getAttribute('data-filter'); renderDiffBasic(activeFiling.filing, activeFiling.ticker); var c2 = panelBody.querySelector('[data-filter="' + diffFilter + '"]'); if (c2) c2.focus(); return; }
     var tog = e.target.closest('[data-toggle]');
     if (tog) {
       var det = $(tog.getAttribute('aria-controls'));
@@ -1803,7 +1823,192 @@
     }
   });
 
+  /* =====================================================================
+   * DIFF READER: side-by-side changes for deep-parsed 10-K / 10-Q filings, the
+   * Claude Opus 5.5 analysis above them, and a crawler that walks down the document
+   * touching each changed paragraph as it reads (Real time or Very fast).
+   * Form 4 transaction tables and 8-K press releases render here too.
+   * ===================================================================== */
+  var DIFF_CACHE = {}, AI_CACHE = {}, readerSpeed = store('edm_reader_speed') || 'realtime', readerState = null;
+  var SECTION_SHORT = { risk_factors: 'Risk Factors', mdna: 'MD&A', market_risk: 'Market Risk', financial_statements: 'Financial Statements' };
+  function fetchCached(cache, path) {
+    if (!cache[path]) cache[path] = liveFetchJson(LIVE_BASE + path).catch(function (e) { delete cache[path]; throw e; });
+    return cache[path];
+  }
+  function opsHtml(ops, side) {
+    return ops.map(function (o) {
+      if (o[0] === '=') return esc(o[1]);
+      if (o[0] === '-' && side === 'before') return '<del>' + esc(o[1]) + '</del>';
+      if (o[0] === '+' && side === 'after') return '<ins>' + esc(o[1]) + '</ins>';
+      return '';
+    }).join('');
+  }
+  function aiCardHtml(ai) {
+    return '<section class="ai-card" aria-label="Claude analysis"><div class="ai-kicker mono">Claude Opus 5.5 \u00b7 pre-generated from the comparison below \u00b7 not investment advice</div>' +
+      '<h3>' + esc(ai.headline) + '</h3><p>' + esc(ai.summary) + '</p>' +
+      (ai.key_changes && ai.key_changes.length ? '<ol class="ai-points">' + ai.key_changes.map(function (k) {
+        return '<li><button type="button" class="ai-cite" data-jump="' + esc(k.cite) + '"><span class="rd-badge ' + esc(k.kind) + '">' + esc(k.kind === 'changed' ? 'reworded' : k.kind === 'added' ? 'new' : 'dropped') + '</span><b>' + esc(k.title) + '</b></button><span>' + esc(k.why_it_matters) + '</span></li>';
+      }).join('') + '</ol>' : '') +
+      (ai.tone ? '<p class="ai-tone"><b>Tone.</b> ' + esc(ai.tone) + '</p>' : '') +
+      (ai.watch && ai.watch.length ? '<p class="ai-tone"><b>Watch next.</b> ' + esc(ai.watch.join('; ')) + '</p>' : '') + '</section>';
+  }
+  var SPIDER_SVG = '<svg viewBox="0 0 40 40" width="30" height="30"><g class="legs-l"><path class="leg l1" d="M17 17 L8 9 L3 12"/><path class="leg l2" d="M16 20 L6 17 L2 21"/><path class="leg l3" d="M16 23 L6 25 L2 30"/><path class="leg l4" d="M17 26 L9 32 L6 38"/></g>' +
+    '<g class="legs-r"><path class="leg r1" d="M23 17 L32 9 L37 12"/><path class="leg r2" d="M24 20 L34 17 L38 21"/><path class="leg r3" d="M24 23 L34 25 L38 30"/><path class="leg r4" d="M23 26 L31 32 L34 38"/></g>' +
+    '<path class="leg touch" d="M24 18 L33 14 L40 15"/>' +
+    '<ellipse class="sp-abd" cx="20" cy="26" rx="5.5" ry="7"/><circle class="sp-head" cx="20" cy="16" r="4"/><circle class="sp-eye" cx="18.6" cy="15" r="0.9"/><circle class="sp-eye" cx="21.4" cy="15" r="0.9"/></svg>';
+  function renderReader(f, t) {
+    var token = panelToken;
+    panel.classList.add('wide');
+    panelBody.innerHTML = '<div class="rd-loading mono">Loading the full comparison\u2026</div>';
+    Promise.all([fetchCached(DIFF_CACHE, f.diff), f.ai ? fetchCached(AI_CACHE, f.ai).catch(function () { return null; }) : Promise.resolve(null)]).then(function (res) {
+      if (token !== panelToken) return;
+      var d = res[0], ai = res[1], secs = d.sections;
+      var tot = { added: 0, changed: 0, removed: 0, same: 0 };
+      secs.forEach(function (s) { for (var k in tot) tot[k] += s.counts[k]; });
+      var html = (ai ? aiCardHtml(ai) : '') +
+        '<div class="rd-head"><div><b>' + esc(f.id) + '</b> vs the previous ' + esc(f.form) + ' filed ' + esc(fmtDate(d.prev_filing_date)) +
+        ' <span class="live-tag">Real SEC text</span></div><div class="rd-sum mono"><span class="c-add">+' + tot.added + ' new</span> <span class="c-chg">~' + tot.changed + ' reworded</span> <span class="c-del">\u2212' + tot.removed + ' dropped</span> \u00b7 ' + tot.same + ' unchanged</div></div>' +
+        '<div class="rd-tools"><div class="rd-secs" role="group" aria-label="Jump to a section">' + secs.map(function (s) {
+          var c = s.counts;
+          return '<button type="button" data-sec="' + s.key + '"><span>' + esc(SECTION_SHORT[s.key] || s.title) + '</span><small class="mono">' + (c.added + c.changed + c.removed) + '</small></button>';
+        }).join('') + '</div>' +
+        '<div class="rd-ctl" role="group" aria-label="Crawler speed"><span class="mono">Crawler</span>' +
+        '<button type="button" data-speed="realtime" aria-pressed="' + (readerSpeed === 'realtime') + '">Real time</button>' +
+        '<button type="button" data-speed="fast" aria-pressed="' + (readerSpeed === 'fast') + '">Very fast</button>' +
+        '<button type="button" data-speed="pause" aria-pressed="false" id="rd-pause">Pause</button></div></div>' +
+        '<div class="rd-doc" id="rd-doc" tabindex="0" aria-label="Paragraph comparison"><div class="spider" id="spider" aria-hidden="true">' + SPIDER_SVG + '</div>' +
+        secs.map(function (s) {
+          var out = ['<h4 class="rd-sec" id="rd-' + s.key + '">' + esc(s.item) + ' \u00b7 ' + esc(SECTION_SHORT[s.key] || s.title) + ' <small class="mono">+' + s.counts.added + ' ~' + s.counts.changed + ' \u2212' + s.counts.removed + '</small></h4>'];
+          var run = [];
+          function flush() {
+            if (!run.length) return;
+            out.push('<details class="rd-fold"><summary class="mono">' + run.length + ' unchanged paragraph' + (run.length === 1 ? '' : 's') + '</summary>' +
+              run.map(function (r) { return '<p class="rd-same" data-key="' + s.key + '#' + r.i + '">' + esc(r.e.text) + '</p>'; }).join('') + '</details>');
+            run = [];
+          }
+          s.entries.forEach(function (e, i) {
+            if (e.t === 'same') { run.push({ e: e, i: i }); return; }
+            flush();
+            var key = s.key + '#' + i, body;
+            if (e.t === 'changed') body = '<div class="rd-before">' + opsHtml(e.ops, 'before') + '</div><div class="rd-after">' + opsHtml(e.ops, 'after') + '</div>';
+            else if (e.t === 'added') body = '<div class="rd-after rd-only">' + esc(e.text) + '</div>';
+            else body = '<div class="rd-before rd-only">' + esc(e.text) + '</div>';
+            out.push('<div class="rd-row ' + e.t + '" data-key="' + key + '" data-words="' + ((e.after || e.text || '').split(/\s+/).length) + '"><span class="rd-badge ' + e.t + '">' + (e.t === 'changed' ? 'reworded' : e.t === 'added' ? 'new' : 'dropped') + '</span>' + body + '</div>');
+          });
+          flush();
+          return out.join('');
+        }).join('') + '</div>' +
+        '<p class="panel-foot">Compared paragraph by paragraph against <a href="' + esc(d.prev_url) + '" target="_blank" rel="noopener">the previous ' + esc(f.form) + '</a>. Number-only edits count as unchanged. <a href="method.html#diffs">How this works</a></p>';
+      panelBody.innerHTML = html;
+      startSpider(token);
+    }).catch(function () {
+      if (token !== panelToken) return;
+      panel.classList.remove('wide');
+      renderDiffBasic(f, t);
+    });
+  }
+  function startSpider(token) {
+    var doc = $('rd-doc'), sp = $('spider');
+    if (!doc || !sp) return;
+    var rows = Array.prototype.slice.call(doc.querySelectorAll('.rd-row'));
+    var st = readerState = { i: 0, paused: false, token: token, timer: 0, userScrolled: false, rows: rows };
+    if (reduceMotion || !rows.length) { rows.forEach(function (r) { r.classList.add('read'); }); sp.hidden = true; return; }
+    doc.addEventListener('wheel', function () { st.userScrolled = true; }, { passive: true });
+    doc.addEventListener('touchmove', function () { st.userScrolled = true; }, { passive: true });
+    function place(row) {
+      var y = row.offsetTop + 4;
+      sp.style.transform = 'translateY(' + y + 'px)';
+      if (!st.userScrolled) doc.scrollTo({ top: Math.max(0, y - doc.clientHeight * 0.3), behavior: 'smooth' });
+    }
+    function step() {
+      if (st.token !== panelToken || readerState !== st || st.paused) return;
+      if (st.i >= rows.length) { sp.classList.remove('walking', 'reading'); sp.classList.add('done'); return; }
+      var row = rows[st.i], fast = readerSpeed === 'fast';
+      sp.classList.add('walking'); sp.classList.remove('reading', 'done');
+      place(row);
+      st.timer = setTimeout(function () {
+        if (st.token !== panelToken || readerState !== st || st.paused) return;
+        sp.classList.remove('walking'); sp.classList.add('reading');
+        rows.forEach(function (r) { r.classList.remove('reading'); });
+        row.classList.add('reading');
+        var words = +row.getAttribute('data-words') || 40;
+        var dwell = fast ? 260 : Math.max(900, Math.min(6500, words * 95));   // roughly reading pace, capped
+        st.timer = setTimeout(function () {
+          row.classList.remove('reading'); row.classList.add('read');
+          st.i++;
+          step();
+        }, dwell);
+      }, fast ? 220 : 700);
+    }
+    st.step = step;
+    step();
+  }
+  function jumpTo(key) {
+    var doc = $('rd-doc'); if (!doc) return;
+    var el = doc.querySelector('[data-key="' + key + '"]'); if (!el) return;
+    var fold = el.closest('details'); if (fold) fold.open = true;
+    if (readerState) {
+      var idx = readerState.rows.indexOf(el);
+      if (idx >= 0) {
+        clearTimeout(readerState.timer);
+        readerState.i = idx; readerState.paused = false; readerState.userScrolled = false;
+        var pb = $('rd-pause'); if (pb) { pb.textContent = 'Pause'; pb.setAttribute('aria-pressed', 'false'); }
+        readerState.step();
+        return;
+      }
+    }
+    doc.scrollTo({ top: Math.max(0, el.offsetTop - 60), behavior: reduceMotion ? 'auto' : 'smooth' });
+    el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 1600);
+  }
+  panelBody.addEventListener('click', function (e) {
+    var j = e.target.closest('[data-jump]'); if (j) { jumpTo(j.getAttribute('data-jump')); return; }
+    var sc = e.target.closest('[data-sec]');
+    if (sc) { var h = $('rd-' + sc.getAttribute('data-sec')), doc = $('rd-doc'); if (h && doc) { if (readerState) readerState.userScrolled = true; doc.scrollTo({ top: h.offsetTop - 8, behavior: reduceMotion ? 'auto' : 'smooth' }); } return; }
+    var sp = e.target.closest('[data-speed]');
+    if (!sp || !readerState) return;
+    var v = sp.getAttribute('data-speed');
+    if (v === 'pause') {
+      readerState.paused = !readerState.paused;
+      sp.textContent = readerState.paused ? 'Resume' : 'Pause';
+      sp.setAttribute('aria-pressed', String(readerState.paused));
+      if (readerState.paused) clearTimeout(readerState.timer); else { readerState.userScrolled = false; readerState.step(); }
+      return;
+    }
+    readerSpeed = v; store('edm_reader_speed', v);
+    panelBody.querySelectorAll('[data-speed]').forEach(function (b) { if (b.getAttribute('data-speed') !== 'pause') b.setAttribute('aria-pressed', String(b === sp)); });
+  });
+
+  function money(n) { return n == null ? '\u2013' : '$' + (Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : Math.abs(n) >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : n.toFixed(2)); }
+  function num(n) { return n == null ? '\u2013' : Math.round(n).toLocaleString(); }
+  function renderForm4(f) {
+    var d = f.form4, own = d.owners.map(function (o) { return esc(o.name) + (o.roles.length ? ' <small>(' + esc(o.roles.join(', ')) + ')</small>' : ''); }).join('; ');
+    var sold = 0, bought = 0;
+    d.transactions.forEach(function (x) { if (x.value) { if (x.ad === 'D' && x.code === 'S') sold += x.value; if (x.ad === 'A' && x.code === 'P') bought += x.value; } });
+    return '<div class="rd-head"><div><b>Insider transactions</b> \u00b7 ' + own + '</div><div class="rd-sum mono">' +
+      (sold ? '<span class="c-del">sold ' + money(sold) + '</span> ' : '') + (bought ? '<span class="c-add">bought ' + money(bought) + '</span> ' : '') +
+      (d.plan_10b5_1 ? '\u00b7 under a 10b5-1 trading plan' : '\u00b7 no 10b5-1 plan flagged') + '</div></div>' +
+      '<div class="tx-wrap"><table class="tx"><thead><tr><th>Date</th><th>What</th><th class="num">Shares</th><th class="num">Price</th><th class="num">Value</th><th class="num">Held after</th></tr></thead><tbody>' +
+      d.transactions.map(function (x) {
+        return '<tr><td class="mono">' + esc(x.date) + '</td><td><span class="rd-badge ' + (x.ad === 'D' ? 'removed' : 'added') + '">' + esc(x.code) + '</span> ' + esc(x.what) + (x.kind === 'derivative' ? ' <small>(derivative)</small>' : '') + '</td>' +
+          '<td class="num mono">' + (x.ad === 'D' ? '\u2212' : '+') + num(x.shares) + '</td><td class="num mono">' + (x.price ? '$' + x.price.toFixed(2) : '\u2013') + '</td><td class="num mono">' + money(x.value) + '</td><td class="num mono">' + num(x.after) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="panel-foot">Parsed from the Form 4 XML on SEC EDGAR. <a href="' + esc(f.sec_url) + '" target="_blank" rel="noopener">Open the filing</a></p>';
+  }
+  function renderPress(f) {
+    var x = f.ex99;
+    return '<div class="rd-head"><div><b>Press release</b> attached to this 8-K' + (f.items.length ? ' \u00b7 Items ' + esc(itemNames(f.items).join('; ')) : '') + '</div></div>' +
+      '<p class="pr-lead">' + esc(x.lead) + '</p>' +
+      (x.highlights.length ? '<h4 class="rd-sec">The numbers</h4><ul class="pr-points">' + x.highlights.map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ul>' : '') +
+      '<p class="panel-foot">From Exhibit 99 on SEC EDGAR. <a href="' + esc(x.url) + '" target="_blank" rel="noopener">Read the full release</a></p>';
+  }
+
   function renderDiff(f, t) {
+    if (f.diff) return renderReader(f, t);
+    if (f.form4 && f.form4.transactions && f.form4.transactions.length) { panelBody.innerHTML = renderForm4(f); return; }
+    if (f.ex99) { panelBody.innerHTML = renderPress(f); return; }
+    renderDiffBasic(f, t);
+  }
+  function renderDiffBasic(f, t) {
     var diffs = diffsFor(f, t);
     function count(ty) { return diffs.filter(function (d) { return d.type === ty; }).length; }
     var shown = diffs.filter(function (d) { return diffFilter === 'all' || d.type === diffFilter; });
@@ -1839,13 +2044,13 @@
     var rows = [['Volume delta', Math.round(mat * 0.5)], ['Hedging shift', Math.round(mat * 0.3)], ['Specificity', Math.round(mat * 0.2)], ['Tier weight', [45, 100, 75, 55][tierOf(f.form)]]];
     panelBody.innerHTML = '<div class="ring-wrap"><svg width="140" height="140" viewBox="0 0 140 140" aria-hidden="true"><circle class="ring-bg" cx="70" cy="70" r="58" stroke-width="10"/>' +
       '<circle class="ring-fg" id="ring-fg" cx="70" cy="70" r="58" stroke-width="10" stroke="' + col + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + C.toFixed(1) + '"/></svg>' +
-      '<div class="ring-c"><b style="color:' + col + '">' + mat + '</b><span>/ 100 materiality</span></div></div>' +
+      '<div class="ring-c"><b style="color:' + col + '">' + mat + '</b><span>/ 100 change score</span></div></div>' +
       '<span class="rank" style="color:' + col + '">' + rank + '</span>' +
-      '<div class="stats"><div class="stat"><b style="color:' + col + '">' + mat + '</b><span>Materiality</span></div>' +
+      '<div class="stats"><div class="stat"><b style="color:' + col + '">' + mat + '</b><span>Change score</span></div>' +
       '<div class="stat"><b class="' + (burial >= 50 ? 'c-amber' : 'c-green') + '">' + burial + '</b><span>Burial</span></div>' +
       '<div class="stat"><b class="' + (gap >= 50 ? 'c-amber' : 'c-green') + '">' + gap + '</b><span>Attention gap</span></div></div>' +
       '<div class="rows">' + rows.map(function (r) { return '<div class="row"><span>' + r[0] + '</span><span class="track"><i data-w="' + (r[1] / 100) + '"></i></span><b>' + r[1] + '</b></div>'; }).join('') + '</div>' +
-      '<p class="panel-foot">Materiality: how significant the disclosure changes are. Burial: how deep key information sits in footnotes. Attention gap: how far market coverage lags the change.</p>';
+      '<p class="panel-foot">Change score: the share of paragraphs that changed versus the previous filing (see the Method page). Burial: how deep key information sits in footnotes. Attention gap: how far market coverage lags the change.</p>';
     requestAnimationFrame(function () { requestAnimationFrame(function () {
       var ring = $('ring-fg'); if (ring) ring.style.strokeDashoffset = (C - mat / 100 * C).toFixed(1);
       panelBody.querySelectorAll('.track i').forEach(function (el) { el.style.transform = 'scaleX(' + el.getAttribute('data-w') + ')'; });
@@ -2155,7 +2360,7 @@
       if (stopped) return;
       if (i < lis.length) { lis[i++].classList.add('done'); setTimeout(tick, reduceMotion ? 0 : 520); return; }
       var d = diffsFor(top[0], t);
-      var text = 'Across ' + t + '\'s recent filings, the highest-materiality document is ' + top[0].id + ' (' + Math.round(top[0].materiality * 100) + '/100). ' +
+      var text = 'Across ' + t + '\'s recent filings, the document with the highest change score is ' + top[0].id + ' (' + Math.round(top[0].materiality * 100) + '/100). ' +
         'The key change: ' + d[0].text + ' ' + (d[1] ? 'Also notable: ' + d[1].text + ' ' : '') +
         'Insider and proxy filings show no conflicting signal in the demo data. Question asked: "' + msg + '".';
       setBusy(typewrite(b, text, function () { setBusy(null); b.insertAdjacentHTML('beforeend', citesHtml(t, 3)); }));
@@ -2173,7 +2378,7 @@
       '<h4>Summary</h4><p>' + esc(R.diffs[0].text) + '</p>' +
       '<h4>Material changes</h4><ul>' + R.diffs.slice(0, 3).map(function (d, i) { return '<li>' + esc(d.text) + ' <span class="mono" style="color:#e3c08a">[' + (i + 1) + ']</span></li>'; }).join('') + '</ul>' +
       '<h4>Coverage</h4><p>' + CAT_ORDER.filter(function (c) { return R.byCat[c]; }).map(function (c) { return esc(CATEGORIES[c].label) + ': ' + R.byCat[c]; }).join(' \u00b7 ') + '</p>' +
-      '<h4>Scores (' + esc(R.f.id) + ')</h4><p>Materiality ' + Math.round(R.f.materiality * 100) + ' \u00b7 Burial ' + Math.round(R.f.burial * 100) + ' \u00b7 Attention gap ' + Math.round(R.f.gap * 100) + '</p>' +
+      '<h4>Scores (' + esc(R.f.id) + ')</h4><p>Change score ' + Math.round(R.f.materiality * 100) + ' \u00b7 Burial ' + Math.round(R.f.burial * 100) + ' \u00b7 Attention gap ' + Math.round(R.f.gap * 100) + '</p>' +
       '<h4>Sources</h4>' + citesHtml(R.t, 3) +
       '<div class="actions"><button type="button" class="btn btn-ghost btn-sm" data-act="dl">Download .md</button><button type="button" class="btn btn-ghost btn-sm" data-act="copy">Copy</button></div></div>';
   }
@@ -2181,7 +2386,7 @@
     if (R.md) return R.md;
     return '# ' + R.t + ' disclosure brief\n\n' + R.s.name + ' | ' + R.today + ' | ' + R.fl.length + ' filings | ILLUSTRATIVE DEMO DATA, NOT INVESTMENT ADVICE\n\n' +
       '## Summary\n\n' + R.diffs[0].text + '\n\n## Material changes\n\n' + R.diffs.slice(0, 3).map(function (d, i) { return '- ' + d.text + ' [' + (i + 1) + ']'; }).join('\n') +
-      '\n\n## Scores (' + R.f.id + ')\n\n- Materiality: ' + Math.round(R.f.materiality * 100) + '\n- Burial: ' + Math.round(R.f.burial * 100) + '\n- Attention gap: ' + Math.round(R.f.gap * 100) +
+      '\n\n## Scores (' + R.f.id + ')\n\n- Change score: ' + Math.round(R.f.materiality * 100) + '\n- Burial: ' + Math.round(R.f.burial * 100) + '\n- Attention gap: ' + Math.round(R.f.gap * 100) +
       '\n\n## Sources\n\n' + R.diffs.slice(0, 3).map(function (d, i) { return '[' + (i + 1) + '] ' + R.t + ' ' + R.f.id + ', ' + d.section; }).join('\n') + '\n';
   }
   var lastReport = null;
@@ -2245,6 +2450,95 @@
   });
 
   /* =====================================================================
+   * DEMO MODE: a short guided tour for first-time visitors, using NVIDIA.
+   * Starts once (no saved watchlist, no shared link); replay from the sidebar or ?tour=1.
+   * ===================================================================== */
+  var TOUR_KEY = 'edm_tour_done', tourEl = null, tourStep = -1, tourTimer = 0;
+  var TOUR = [
+    { target: null, title: 'Welcome to EDGAR Monitor', text: 'In about a minute you will see how it reads SEC filings for what changed, using NVIDIA as the example. Everything you see is real SEC data.', next: 'Start the tour' },
+    { target: '#graph-area', title: 'Every dot is a public company', text: 'All 10,000+ SEC-listed companies, banded by exchange. Drag to spin the globe, scroll to zoom, and click any dot to open that company.' },
+    { target: '#search-combo', title: 'Search any public company', text: 'Type a ticker or a name. Let\u2019s open NVIDIA.', action: function () { openTab('NVDA'); } },
+    { target: '#filings', title: 'Every filing, live from the SEC', text: 'NVIDIA\u2019s full filing history loads straight from SEC EDGAR while the crawler indexes it into the hive. Filter by form, category or words.', wait: 900 },
+    { target: '#panel', title: 'What changed, paragraph by paragraph', text: 'This is NVIDIA\u2019s latest 10-Q compared with the one before. New, reworded and dropped paragraphs are marked, and the crawler walks down the document reading each change.', action: function () {
+      var f = getFilings('NVDA').filter(function (x) { return x.diff; })[0];
+      if (f) { openPanel(f, 'NVDA'); setTimeout(function () { setTab('diff'); }, 60); }
+    }, wait: 1400 },
+    { target: '#composer', title: 'Ask about the company', text: 'Each company tab has its own chat. Answers come from the filings and link to them. Try \u201cany insider selling?\u201d', action: function () { closePanel(); input.value = 'any insider selling?'; autosize(); } },
+    { target: null, title: 'You\u2019re all set', text: 'Open more companies to grow your hive. You can replay this tour any time from the sidebar.', next: 'Start exploring' }
+  ];
+  function tourRect(sel) {
+    var el = sel && document.querySelector(sel);
+    if (!el || el.hidden || !el.offsetWidth) return null;
+    var r = el.getBoundingClientRect(), pad = 6;
+    return { x: r.left - pad, y: r.top - pad, w: r.width + pad * 2, h: r.height + pad * 2 };
+  }
+  function tourPaint() {
+    if (!tourEl) return;
+    var s = TOUR[tourStep], box = tourEl.querySelector('.tour-hole'), card = tourEl.querySelector('.tour-card');
+    var r = tourRect(s.target), vw = window.innerWidth, vh = window.innerHeight;
+    if (r) {
+      box.hidden = false;
+      box.style.cssText = 'left:' + r.x + 'px;top:' + r.y + 'px;width:' + r.w + 'px;height:' + r.h + 'px';
+      tourEl.classList.remove('centered');
+      var cw = Math.min(340, vw - 24), ch = card.offsetHeight || 180, cx, cy;
+      if (r.x + r.w + cw + 16 < vw) { cx = r.x + r.w + 12; cy = Math.min(Math.max(12, r.y), vh - ch - 12); }
+      else if (r.x - cw - 12 > 0) { cx = r.x - cw - 12; cy = Math.min(Math.max(12, r.y), vh - ch - 12); }
+      else { cx = Math.max(12, Math.min(vw - cw - 12, r.x)); cy = r.y + r.h + 12 + ch < vh ? r.y + r.h + 12 : Math.max(12, r.y - ch - 12); }
+      if (r.w > vw * 0.6 && r.h > vh * 0.5) { cx = Math.max(12, (vw - cw) / 2); cy = Math.max(12, vh - ch - 24); }
+      card.style.cssText = 'left:' + cx + 'px;top:' + cy + 'px;width:' + cw + 'px';
+    } else {
+      box.hidden = true;
+      tourEl.classList.add('centered');
+      card.style.cssText = '';
+    }
+  }
+  function tourShow(i) {
+    clearTimeout(tourTimer);
+    tourStep = i;
+    var s = TOUR[i];
+    if (!s) { tourEnd(); return; }
+    if (s.action) { try { s.action(); } catch (e) {} }
+    var card = tourEl.querySelector('.tour-card');
+    card.innerHTML = '<div class="tour-count mono">' + (i + 1) + ' / ' + TOUR.length + '</div><h2 id="tour-title">' + esc(s.title) + '</h2><p>' + esc(s.text) + '</p>' +
+      '<div class="tour-btns">' + (i < TOUR.length - 1 ? '<button type="button" class="text-btn" data-tour="skip">Skip tour</button>' : '<span></span>') +
+      '<div>' + (i > 0 && i < TOUR.length - 1 ? '<button type="button" class="btn btn-ghost btn-sm" data-tour="back">Back</button> ' : '') +
+      '<button type="button" class="btn btn-cta btn-sm" data-tour="next">' + esc(s.next || 'Next') + '</button></div></div>';
+    tourPaint();
+    tourTimer = setTimeout(tourPaint, s.wait || 350);
+    setTimeout(function () { var b = card.querySelector('[data-tour="next"]'); if (b) b.focus(); }, 30);
+  }
+  function tourStart() {
+    if (tourEl) return;
+    tourEl = document.createElement('div');
+    tourEl.className = 'tour';
+    tourEl.setAttribute('role', 'dialog');
+    tourEl.setAttribute('aria-modal', 'true');
+    tourEl.setAttribute('aria-labelledby', 'tour-title');
+    tourEl.innerHTML = '<div class="tour-hole" hidden></div><div class="tour-card"></div>';
+    document.body.appendChild(tourEl);
+    tourEl.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-tour]'); if (!b) return;
+      var a = b.getAttribute('data-tour');
+      if (a === 'next') tourShow(tourStep + 1); else if (a === 'back') tourShow(tourStep - 1); else tourEnd();
+    });
+    tourShow(0);
+  }
+  function tourEnd() {
+    clearTimeout(tourTimer);
+    if (tourEl) { tourEl.remove(); tourEl = null; }
+    tourStep = -1;
+    store(TOUR_KEY, true);
+  }
+  window.addEventListener('resize', function () { if (tourEl) tourPaint(); });
+  document.addEventListener('keydown', function (e) {
+    if (!tourEl) return;
+    if (e.key === 'Escape') { e.stopPropagation(); tourEnd(); }
+    else if (e.key === 'ArrowRight') tourShow(tourStep + 1);
+    else if (e.key === 'ArrowLeft' && tourStep > 0) tourShow(tourStep - 1);
+  }, true);
+  document.addEventListener('click', function (e) { if (e.target.closest('[data-start-tour]')) { e.preventDefault(); if (tourEl) tourEnd(); tourStart(); } });
+
+  /* =====================================================================
    * INIT
    * ===================================================================== */
   initGraph();
@@ -2260,6 +2554,8 @@
   Promise.all([loadUniverse(), liveInit([])]).then(function () {
     var initial = (fromUrl.length ? fromUrl : (Array.isArray(saved) ? saved : [])).map(ensureTicker).filter(Boolean);
     initial.forEach(function (t) { addStock(t, { instant: true, noSelect: true }); });
+    var wantTour = /[?&]tour=1\b/.test(location.search) || (!fromUrl.length && !initial.length && !store(TOUR_KEY));
+    if (wantTour) setTimeout(tourStart, 600);
     if (fromUrl.length === 1 && initial[0]) { openTab(initial[0]); return; }
     if (!fromUrl.length) {
       (savedTabs.open || []).forEach(function (t) { t = ensureTicker(t); if (t && pinned.indexOf(t) >= 0 && openTabs.indexOf(t) < 0) openTabs.push(t); });

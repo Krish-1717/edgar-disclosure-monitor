@@ -36,6 +36,12 @@ cp .env.example .env        # set ORACLE_USER_AGENT="Your Name you@example.com"
 
 **Getting real data onto the website.** GitHub Pages is static, so visitors can't reach a FastAPI server on your machine. `python -m oracle export --out DIR` writes `DIR/index.json` plus `DIR/companies/{TICKER}.json` (pure ASCII, about 6-40 KB per company), which the site can `fetch()` from its own origin with no backend and no CORS. Each filing in a feed uses the `FILING_DATA` fields from `assets/js/app.js` (`id`, `form`, `date`, `group`, `current`) plus `accession`, `sec_url`, `index_url`, amendment info, and per-section `excerpt` and `change`. `change` compares the section with the previous filing of the same form: paragraphs added / modified / removed, `change_ratio`, `word_delta_pct`, and up to 3 `added_samples` and `modified_samples` (`{before, after}`, which matches the demo's `DIFFS`). `GET /companies/{ticker}/feed` serves the same payload live. The default output folder `data/oracle/export` is gitignored.
 
+**Scheduled crawl (no server).** `.github/workflows/oracle-crawl.yml` runs every 15 minutes on GitHub Actions: it crawls new filings for the 20 featured companies, rebuilds the feeds, per-filing diff files (`assets/data/oracle/diffs/`) and Form 4 / 8-K extracts, asks Claude Opus 5.5 for a cited analysis of each new 10-K/10-Q comparison (`assets/data/oracle/ai/`, hard spending cap per run), and commits only files whose content changed. It needs two repository secrets (Settings -> Secrets and variables -> Actions): `ORACLE_USER_AGENT` (required, SEC User-Agent with a contact email) and `ANTHROPIC_API_KEY` (optional; without it the AI step is skipped). Only the crawl database is cached between runs.
+
+```bash
+.venv/bin/python -m oracle summarize --out assets/data/oracle --max-filings 5 --budget-usd 1   # same AI step, locally
+```
+
 **Every public company, live.** `data.sec.gov/submissions` sends `Access-Control-Allow-Origin: *`, so `app.html` reads the full filing history of any SEC registrant straight from the visitor's browser, with no backend. Search covers all ~10,400 SEC-listed tickers from `assets/data/oracle/universe.json` (refresh with `python -m oracle universe --out assets/data/oracle/universe.json`). Opening a company starts a tab with its own chat, flies the 3D hive to that company, and lists every filing in a side panel while the crawler indexes them. Filing documents themselves (`www.sec.gov/Archives`) do not allow browser CORS, so section text and changes still come from the ORACLE feeds below.
 
 **The demo app also uses these feeds.** `app.html` loads `assets/data/oracle/index.json` and, for each watchlisted ticker with a feed, shows its real Tier 1 filings (10-K, 10-Q, 8-K, DEF 14A, Form 4) in the hive, with real SEC links, accession numbers, SHA-256 hashes, amendment versions and the real section changes in the Changes tab (marked "Real SEC filing"). Forms the crawler does not cover yet, fictional tickers (`XQRN`, `XHLD`) and foreign filers (`TSM`, `ASML`) stay illustrative, and the app falls back to the demo data if the feeds can't be fetched. To refresh the published data:
@@ -84,7 +90,7 @@ High gap = material change that the market hasn't noticed yet.
 
 **News Quality Score**: 8-bucket classifier (REGULATORY, EARNINGS, ANALYST, MACRO, PRODUCT, LEADERSHIP, NEGATIVE, POSITIVE) weighted by academic research (Karpoff et al. 2008, Ball & Brown 1968, Tetlock 2007). Composite = 0.35×coverage + 0.65×quality.
 
-**Backtest results**: IC=0.18, Hit Rate=61%, Spread=+2.3%/month, Sharpe=1.4
+**Backtest results**: not published. Earlier figures were removed until they can be reproduced from the ORACLE data with code (see `method.html`).
 
 ## Quick Start
 

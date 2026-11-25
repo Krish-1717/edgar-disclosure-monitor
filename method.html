@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+<script>try{var t=JSON.parse(localStorage.getItem('edm_theme')||'null');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<title>Method &mdash; EDGAR Disclosure Monitor</title>
+<meta name="description" content="How EDGAR Disclosure Monitor fetches SEC filings, compares them paragraph by paragraph, scores the changes and writes its AI summaries, including what it cannot tell you.">
+<link rel="canonical" href="https://krish-1717.github.io/edgar-disclosure-monitor/method.html">
+<meta name="theme-color" content="#02030a">
+<meta name="color-scheme" content="dark light">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="EDGAR Disclosure Monitor">
+<meta property="og:title" content="Method &mdash; EDGAR Disclosure Monitor">
+<meta property="og:description" content="How EDGAR Disclosure Monitor fetches SEC filings, compares them paragraph by paragraph, scores the changes and writes its AI summaries, including what it cannot tell you.">
+<meta property="og:url" content="https://krish-1717.github.io/edgar-disclosure-monitor/method.html">
+<meta property="og:image" content="https://krish-1717.github.io/edgar-disclosure-monitor/assets/img/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="EDGAR Disclosure Monitor: Every SEC filing, read for what changed.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Method &mdash; EDGAR Disclosure Monitor">
+<meta name="twitter:description" content="How EDGAR Disclosure Monitor fetches SEC filings, compares them paragraph by paragraph, scores the changes and writes its AI summaries, including what it cannot tell you.">
+<meta name="twitter:image" content="https://krish-1717.github.io/edgar-disclosure-monitor/assets/img/og-image.jpg">
+<meta name="twitter:image:alt" content="EDGAR Disclosure Monitor: Every SEC filing, read for what changed.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-nav" role="banner">
+  <a class="brand" href="./" aria-label="EDGAR Disclosure Monitor home"><img src="assets/img/favicon.svg" alt="" width="28" height="28"><span>EDGAR Monitor</span></a>
+  <nav aria-label="Primary"><ul>
+    <li><a class="nav-link" href="./">Home</a></li>
+    <li><a class="nav-link" href="method.html" aria-current="page">Method</a></li>
+    <li><a class="nav-link" href="app.html">Open the app</a></li>
+  </ul></nav>
+  <a class="btn btn-cta btn-sm" href="#waitlist" data-waitlist>Get early access</a>
+</header>
+<main id="main" class="page method">
+  <span class="eyebrow">Method</span>
+  <h1>How every number is made</h1>
+  <p>EDGAR Monitor reads SEC filings and tells you what changed. This page explains exactly how, so you can judge the output yourself. Nothing here is investment advice.</p>
+
+  <h2 id="sources">Where the data comes from</h2>
+  <ul>
+    <li><strong>Company list.</strong> All 10,000+ SEC-listed tickers come from the SEC&rsquo;s <code>company_tickers_exchange.json</code>, refreshed by the crawler.</li>
+    <li><strong>Filing history.</strong> When you open a company, your browser reads its full filing list directly from <code>data.sec.gov/submissions</code>. Nothing passes through our servers; there are none.</li>
+    <li><strong>Documents.</strong> For the companies we compare in depth (20 large caps today), the ORACLE crawler downloads each filing&rsquo;s main document and index from the SEC Archives, stores a SHA-256 fingerprint, and extracts the parts described below.</li>
+    <li><strong>Freshness.</strong> The crawler runs every 15 minutes on GitHub Actions and republishes the site&rsquo;s data when something new is filed.</li>
+  </ul>
+
+  <h2 id="fair-access">SEC fair access</h2>
+  <p>The crawler identifies itself with a User-Agent that includes a contact email, stays under the SEC&rsquo;s limit of 10 requests per second (it targets 8), backs off on rate-limit or server errors, and only downloads filings it has not seen before.</p>
+
+  <h2 id="sections">Sections</h2>
+  <p>For 10-K and 10-Q filings the crawler converts the HTML to text and finds the item headings: Risk Factors (Item 1A), MD&amp;A (Item 7 in a 10-K, Part I Item 2 in a 10-Q), Market Risk (Item 7A or Part I Item 3) and Financial Statements (Item 8 or Part I Item 1). Tables of contents and running page headers are ignored. When a 10-K&rsquo;s Item 8 only points to the statements elsewhere, Item 15 is used instead. In a 20-company test, 102 of 107 filings had all four sections; the misses were short quarterly risk-factor sections.</p>
+
+  <h2 id="diffs">How filings are compared</h2>
+  <p>Each section is compared with the same section of the previous filing of the same form (a 10-Q with the previous 10-Q, a 10-K with the previous 10-K). Text is split into paragraphs of at least 15 words, and every paragraph in the new filing is matched to the most similar paragraph in the old one by word overlap (Jaccard similarity of their word sets, with all numbers treated as the same word):</p>
+  <ul>
+    <li><strong>Unchanged</strong>: overlap of 0.8 or more. Number-only edits (a new quarter&rsquo;s figures) land here on purpose.</li>
+    <li><strong>Reworded</strong>: overlap from 0.5 up to 0.8. Shown side by side with the changed words highlighted.</li>
+    <li><strong>New</strong>: no old paragraph overlaps by 0.5 or more.</li>
+    <li><strong>Dropped</strong>: an old paragraph with no new paragraph overlapping it by 0.5 or more.</li>
+  </ul>
+
+  <h2 id="change-score">Change score</h2>
+  <p>For each section, the change score is the share of paragraphs that are not unchanged: (new + reworded + dropped) &divide; (paragraphs in the new filing + dropped). A filing&rsquo;s score is the average across its sections, with Risk Factors and MD&amp;A counted twice. It measures how much the wording moved, not whether the change matters to a business or its stock; that is your call. Burial score and attention gap, shown in the app, are still illustrative.</p>
+
+  <h2 id="forms">Form 4 and 8-K</h2>
+  <ul>
+    <li><strong>Form 4</strong> transaction tables are read from the filing&rsquo;s XML: who traded, their role, the transaction code (for example S for an open-market sale), shares, price, value, shares held afterwards, and whether a 10b5-1 trading plan is flagged.</li>
+    <li><strong>8-K</strong> items are named in plain English. When the 8-K attaches a press release (Exhibit 99), the opening paragraphs and the sentences carrying figures are pulled out.</li>
+  </ul>
+
+  <h2 id="ai">AI summaries</h2>
+  <p>For each new comparison, Claude Opus 5.5 receives only the new, reworded and dropped paragraphs, each tagged with an id, and writes a headline, a short summary and the key changes. Every key change must cite the id of the paragraph it comes from, and the app links each one back to that paragraph. The model is told to use only the passages provided and to give no investment advice. Summaries are generated in advance by the scheduled job with a fixed spending cap per run, and published as static files; your browser never talks to the model.</p>
+
+  <h2 id="limits">What this cannot tell you</h2>
+  <ul>
+    <li>Whether a change is material to the company or to its stock price.</li>
+    <li>Changes inside tables, exhibits other than Exhibit 99, or XBRL financial data (not yet compared).</li>
+    <li>Paragraph comparisons for companies outside the 20 covered today; for those you get the live filing list and filing details.</li>
+    <li>Anything about performance: we publish no backtest results until they can be reproduced from this data, with code.</li>
+  </ul>
+
+  <h2 id="code">Code</h2>
+  <p>The crawler, comparison and scoring code is open: <a href="https://github.com/Krish-1717/edgar-disclosure-monitor" target="_blank" rel="noopener">github.com/Krish-1717/edgar-disclosure-monitor</a> (the <code>oracle/</code> folder).</p>
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <a class="brand" href="./"><img src="assets/img/favicon.svg" alt="" width="28" height="28"><span>EDGAR Disclosure Monitor</span></a>
+    <nav aria-label="Footer"><ul>
+      <li><a href="app.html">Live demo</a></li>
+      <li><a href="privacy.html">Privacy</a></li>
+      <li><a href="terms.html">Terms</a></li>
+      <li><button type="button" class="linklike" data-cookie-settings>Cookie settings</button></li>
+      <li><a href="https://github.com/Krish-1717/edgar-disclosure-monitor" target="_blank" rel="noopener">GitHub</a></li>
+    </ul></nav>
+    <p class="disclaimer">Demo data is illustrative. Not investment advice. Not affiliated with or endorsed by the U.S. Securities and Exchange Commission. &copy; 2026 Krish Patel.</p>
+  </div>
+</footer>
+<script src="assets/js/site.js"></script>
+</body>
+</html>

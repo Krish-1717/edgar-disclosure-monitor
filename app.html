@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+<script>try{var t=JSON.parse(localStorage.getItem('edm_theme')||'null');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <title>Live demo &mdash; EDGAR Disclosure Monitor</title>
 <meta name="description" content="Interactive demo: build a hive of SEC filers across 50+ form types, watch the crawler discover, extract and analyze filings, and ask the AI workspace about any change. Illustrative data.">
 <link rel="canonical" href="https://krish-1717.github.io/edgar-disclosure-monitor/app.html">
 <meta name="theme-color" content="#02030a">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="dark light">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="EDGAR Disclosure Monitor">
 <meta property="og:title" content="EDGAR Disclosure Monitor &mdash; live demo">
@@ -74,7 +75,7 @@
       <div class="quick" id="quick-add"></div>
     </div>
     <p class="sb-foot">Filings come live from SEC EDGAR for every listed company. Scores and relationships marked illustrative are demo data. Not investment advice.<br>
-      <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <button type="button" data-cookie-settings>Cookie settings</button></p>
+      <button type="button" data-start-tour>Take the tour</button> &middot; <a href="method.html">Method</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <button type="button" data-cookie-settings>Cookie settings</button></p>
   </aside>
 
   <!-- ============ MAIN: CRAWLER + HIVE ============ -->

@@ -253,15 +253,50 @@ var WEB3FORMS_ACCESS_KEY = 'be3415c5-5a4d-4a87-b6ae-49bd8b23de67'; // from https
       .then(function () { btn.disabled = false; btn.textContent = 'Get early access'; });
   }
 
+  /* ---------------- Theme: dark (default) / light, follows the system until chosen ---------------- */
+  var THEME_KEY = 'edm_theme';
+  function systemTheme() { return window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+  function currentTheme() { return document.documentElement.getAttribute('data-theme') || systemTheme(); }
+  function paintToggles() {
+    var light = currentTheme() === 'light';
+    document.querySelectorAll('[data-theme-toggle]').forEach(function (b) {
+      b.setAttribute('aria-label', light ? 'Switch to dark mode' : 'Switch to light mode');
+      b.setAttribute('title', light ? 'Dark mode' : 'Light mode');
+    });
+  }
+  function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    store(THEME_KEY, t);
+    paintToggles();
+    try { window.dispatchEvent(new Event('edm-theme')); } catch (e) {}
+  }
+  function addToggles() {
+    var html = '<svg class="ic-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>' +
+      '<svg class="ic-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+    document.querySelectorAll('.tb-right, .site-nav, [data-theme-slot]').forEach(function (slot) {
+      if (slot.querySelector('[data-theme-toggle]')) return;
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'theme-toggle'; b.setAttribute('data-theme-toggle', ''); b.innerHTML = html;
+      var cta = slot.querySelector('[data-waitlist]');
+      if (cta && cta.parentNode === slot) slot.insertBefore(b, cta);
+      else if (cta && cta.parentNode) cta.parentNode.insertBefore(b, cta);
+      else slot.appendChild(b);
+    });
+    paintToggles();
+  }
+
   /* ---------------- Wire up ---------------- */
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-waitlist]');
     if (t) { e.preventDefault(); openDialog(t); return; }
+    var tt = e.target.closest('[data-theme-toggle]');
+    if (tt) { setTheme(currentTheme() === 'light' ? 'dark' : 'light'); return; }
     var c = e.target.closest('[data-cookie-settings]');
     if (c) { e.preventDefault(); showBanner(); }
   });
 
   function init() {
+    addToggles();
     var c = store(CONSENT_KEY);
     if (c) applyConsent(c); else showBanner();
     if (location.hash === '#waitlist') openDialog();
